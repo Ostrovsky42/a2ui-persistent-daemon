@@ -56,6 +56,30 @@ go vet ./...
 publication barrier survive a client reconnect. `test-startup-stress` runs
 500 concurrent listener starts to cover the socket startup lock.
 
+The staged Omarchy protocol fixture has its own conformance replay:
+
+```bash
+go test ./conformance -run TestOmarchyChoiceFixtureReplaysAllSixOperations
+```
+
+It must exercise all six public mutation types through a hardened session.
+
+## Documentation checkpoint
+
+The Omarchy/security material is split by audience:
+
+- [Manual draft](manual/a2ui.md) — short user-facing staged chapter;
+- [six-operation protocol guide](protocol-guide.md) — practical sequencing and fixture walkthrough;
+- [security model](security-model.md) — threat boundaries and bounded safety claim;
+- [security evidence](security-evidence.md) — claim → code → test → status ledger;
+- [maintainer proposal draft](omarchy-submission.md) — upstream demo and submission gates;
+- [`references/PROTOCOL.md`](../references/PROTOCOL.md) — normative contract.
+
+Do not copy proposed commands from the Manual draft into agent instructions as
+if they already exist. In particular, a stable no-JSON agent CLI for
+publish/wait-event/status remains a prerequisite for the upstream-ready
+quickstart.
+
 ## Diagnostics
 
 | Symptom | Action |
@@ -72,3 +96,7 @@ publication barrier survive a client reconnect. `test-startup-stress` runs
 `make test` and `make test-race` remain release gates. At the current
 revision, the agent must run and report their fresh result; smoke or focused
 E2E success does not replace a full release verification.
+
+The documentation evidence ledger is also authoritative for known open
+security/lifecycle observations. A prose change must not silently promote an
+`UNVERIFIED` or `OPEN` item to a security guarantee.
