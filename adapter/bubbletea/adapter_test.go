@@ -517,8 +517,8 @@ func TestExplicitBoxPresentationOverridesPresetDefaults(t *testing.T) {
 	r := NewRendererWithPreset(DefaultTheme, PresetDashboard)
 	doc := eng.Document()
 	withPresetBorder := r.RenderTree(doc, "", nil, nil, 40, 10)
-	if !strings.Contains(withPresetBorder, "+") {
-		t.Fatalf("expected dashboard card preset border, got:\n%s", withPresetBorder)
+	if !strings.Contains(withPresetBorder, "╭") || !strings.Contains(withPresetBorder, "╯") {
+		t.Fatalf("expected dashboard card rounded preset border, got:\n%s", withPresetBorder)
 	}
 
 	if err := eng.Apply(protocol.Operation{
@@ -529,7 +529,7 @@ func TestExplicitBoxPresentationOverridesPresetDefaults(t *testing.T) {
 	}
 	doc = eng.Document()
 	explicitNone := r.RenderTree(doc, "", nil, nil, 40, 10)
-	if strings.Contains(explicitNone, "+") {
+	if strings.ContainsAny(explicitNone, "╭╮╰╯") {
 		t.Fatalf("explicit presentation props must override preset defaults, got:\n%s", explicitNone)
 	}
 }

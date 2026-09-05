@@ -136,6 +136,18 @@ func (d *Daemon) handleClient(parent context.Context, conn net.Conn) {
 			msg := read.msg
 			switch msg.Kind {
 			case ipc.KindDetach:
+				// Release semantic ownership before acknowledging detach so a successful
+				// Client.Close guarantees immediate reattach cannot observe client_busy.
+				if clientID != "" {
+					d.clearActiveConn(conn)
+					d.lease.release(clientID)
+					clientID = ""
+				}
+				if msg.RequestID != "" {
+					if err := writeClientMessage(conn, writer, ipc.Message{V: ipc.Version, Kind: ipc.KindDetachAck, RequestID: msg.RequestID}); err != nil {
+						return
+					}
+				}
 				return
 			case ipc.KindInteraction:
 				if ierr := d.handleInteraction(ctx, msg.Interaction); ierr != nil {
