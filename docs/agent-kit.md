@@ -62,7 +62,8 @@ The staged Omarchy protocol fixture has its own conformance replay:
 go test ./conformance -run TestOmarchyChoiceFixtureReplaysAllSixOperations
 ```
 
-It must exercise all six public mutation types through a hardened session.
+It exercises all six public mutation types through a hardened session and is
+also included in the shipped strict-NDJSON example gate.
 
 ## Documentation checkpoint
 
@@ -93,10 +94,25 @@ quickstart.
 
 ## Release status
 
-`make test` and `make test-race` remain release gates. At the current
-revision, the agent must run and report their fresh result; smoke or focused
-E2E success does not replace a full release verification.
+`make test` and `make test-race` remain release gates. Smoke or focused E2E
+success never replaces them.
 
-The documentation evidence ledger is also authoritative for known open
-security/lifecycle observations. A prose change must not silently promote an
-`UNVERIFIED` or `OPEN` item to a security guarantee.
+The documentation evidence ledger is authoritative for known open or
+unverified security claims. A prose change must not silently promote an
+`UNVERIFIED` item to a security guarantee.
+
+The branch-level GitHub Actions matrix was fully green on exact head
+`6f1b08b6bfa5c97ec6bedf7f53df5727d804fad8` in run `33991876834`:
+
+```text
+format                         PASS
+go test ./...                  PASS
+go test -race ./...            PASS
+go vet ./...                   PASS
+wire fuzz smoke                PASS
+document reducer fuzz smoke    PASS
+IPC codec fuzz smoke           PASS
+```
+
+Any later code change invalidates that exact-head evidence and requires a new
+full run before reporting the branch release-green again.
