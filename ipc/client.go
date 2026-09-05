@@ -277,6 +277,13 @@ func (c *Client) request(in Interaction) error {
 	return c.requestMessage(Message{V: Version, Kind: KindInteraction, Interaction: &in})
 }
 
+func responseError(result clientResponse) error {
+	if result.err != nil {
+		return result.err
+	}
+	return nil
+}
+
 func (c *Client) requestMessage(msg Message) error {
 	id := fmt.Sprintf("r-%d", c.nextReq.Add(1))
 	msg.RequestID = id
@@ -301,17 +308,24 @@ func (c *Client) requestMessage(msg Message) error {
 	defer timer.Stop()
 	select {
 	case result := <-response:
-		if result.err != nil {
-			return result.err
-		}
-		return nil
+		return responseError(result)
 	case <-timer.C:
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
 		return NewError("ipc.request_timeout", "daemon request timed out")
 	case <-c.closed:
-		return NewError("ipc.connection_closed", "daemon connection closed")
+		// A successful request response (notably detach_ack) can be decoded
+		// immediately before the server's expected EOF. In that case both the
+		// response channel and c.closed are ready, and a Go select may choose
+		// either one. Prefer the request-bound response so a successful detach
+		// cannot be misreported as ipc.connection_closed.
+		select {
+		case result := <-response:
+			return responseError(result)
+		default:
+			return NewError("ipc.connection_closed", "daemon connection closed")
+		}
 	}
 }
 
