@@ -101,15 +101,19 @@ See:
 
 ## Run it today
 
-The daemon and terminal client exist now:
+The daemon and terminal client exist today, but the final Omarchy package/install path does not. From a source checkout, use the real development entrypoints:
 
 ```bash
-a2uid -session default
+go run ./cmd/a2uid -session default
 ```
 
+and in another terminal:
+
 ```bash
-a2ui -preset dashboard
+go run ./cmd/a2ui -preset dashboard
 ```
+
+Alternatively use the reproducible developer wrapper documented in [`docs/agent-kit.md`](../docs/agent-kit.md).
 
 Default control socket:
 
@@ -121,7 +125,7 @@ Fallback is UID-scoped under `/tmp`.
 
 Only one interactive terminal client is supported in this checkpoint.
 
-The repository also exposes developer commands through `make help` and [`docs/agent-kit.md`](../docs/agent-kit.md).
+Do not copy the source-checkout commands into a future Omarchy Manual install section. The staged Manual keeps packaging as an explicit prerequisite.
 
 ## What is still draft
 
