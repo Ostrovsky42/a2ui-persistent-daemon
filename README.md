@@ -101,7 +101,6 @@ func main() {
 }
 ```
 
-
 ## Bubble Tea Renderer V2
 
 `adapter/bubbletea` — первый полноценный expressive renderer. Semantic props остаются в Document, а конкретная визуализация выбирается renderer-side preset’ом:
@@ -179,6 +178,25 @@ Daemon/client IPC is a **local control protocol**, not a new public A2UI operati
 
 `cmd/a2ui-runner` remains standalone and in-process for renderer development, conformance and CI.
 
+## Developer and agent workflow
+
+Run `make help` from the module root for the persistent-daemon developer commands. The reproducible daemon, smoke, focused-test, and agent operating workflow is documented in [docs/agent-kit.md](docs/agent-kit.md).
+
+## Omarchy / protocol / security documentation
+
+The current Omarchy-oriented documentation checkpoint is split by audience instead of duplicating one large spec:
+
+- [staged Omarchy Manual chapter](docs/manual/a2ui.md) — user-facing draft; explicitly blocked on packaging and a no-JSON agent CLI;
+- [six-operation protocol guide](docs/protocol-guide.md) — practical sequencing and the executable `omarchy-choice.ndjson` fixture;
+- [security model](docs/security-model.md) — threat boundaries and bounded Bash comparison;
+- [security evidence ledger](docs/security-evidence.md) — claim → implementation → test → current status;
+- [Omarchy maintainer proposal draft](docs/omarchy-submission.md) — demo, packaging and upstream gates;
+- [A2UI for Omarchy overview](references/OMARCHY.md) — pitch and links without duplicating the normative protocol.
+
+`references/PROTOCOL.md` remains normative. The documentation deliberately does **not** claim HTTP caller authentication or terminal escape sanitization until those boundaries have implementation evidence.
+
+The documentation package is reviewable now, but it is not yet an upstream-ready Omarchy submission. The remaining product prerequisites are deliberately visible in the Manual and submission draft instead of being represented as existing features.
+
 ## Transport profiles
 
 ### NDJSON / stdio
@@ -210,7 +228,7 @@ go test -race ./...
 go vet ./...
 ```
 
-Conformance replay lives in `conformance/testdata/`. Fuzz entrypoints are in `wire/fuzz_test.go`, `document/model_test.go`, and `ipc/codec_test.go`.
+Conformance replay lives in `conformance/testdata/` plus the staged Omarchy walkthrough under `assets/examples/`. Fuzz entrypoints are in `wire/fuzz_test.go`, `document/model_test.go`, and `ipc/codec_test.go`.
 
 ## Нормативные документы
 

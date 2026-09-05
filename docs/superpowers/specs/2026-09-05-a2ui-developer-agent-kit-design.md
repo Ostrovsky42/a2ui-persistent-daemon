@@ -48,8 +48,10 @@ It is intentionally not a renderer test.
 | `make test-reattach` | Run the persistent daemon reattach E2E test. |
 | `make test-startup-stress` | Run the concurrent Unix listener test with `-count=500`. |
 
-`PORT`, `SESSION`, `SOCK`, and `PRESET` may be overridden through Make
-variables. Defaults are `PORT=8080`, `SESSION=smoke`, and `PRESET=dashboard`.
+`PORT`, `SMOKE_PORT`, `SESSION`, `SOCK`, and `PRESET` may be overridden through
+Make variables. Foreground daemon defaults are `PORT=8080`, `SESSION=smoke`,
+and `PRESET=dashboard`; isolated smoke targets default to `SMOKE_PORT=18080`
+so they do not collide with the foreground development daemon.
 The foreground daemon target derives `SOCK` if omitted and displays it for a
 second terminal. Temporary smoke targets must never use a socket directly in
 `/tmp`, because `a2uid` correctly secures the socket parent directory.
@@ -83,6 +85,5 @@ claim is allowed while `make test` or `make test-race` fails.
 
 Tooling changes require `make smoke-http`, `make smoke-ipc`, focused reattach
 and startup-stress tests, then `make test`, `make test-race`, and `go vet ./...`.
-The two existing Bubble Tea renderer failures are a separate release blocker;
-their observed result must be reported rather than hidden or weakened by this
-harness.
+Full release gates remain explicit: the harness must report their fresh
+observed result and must never weaken or replace them with smoke evidence.
