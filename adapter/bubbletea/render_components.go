@@ -12,7 +12,7 @@ import (
 )
 
 func (r *Renderer) renderText(n document.Node, maxW int) string {
-	text := propString(n, "text", "") + n.Text
+	text := SanitizeText(propString(n, "text", "") + n.Text)
 	variant := propString(n, "variant", "body")
 	prof := profileFor(r.Preset)
 	st := lipgloss.NewStyle().Foreground(r.Theme.Text)
@@ -36,7 +36,8 @@ func (r *Renderer) renderText(n document.Node, maxW int) string {
 }
 
 func (r *Renderer) renderInput(n document.Node, focused bool, currentValue string, caret, maxW int, state RenderState) string {
-	placeholder := propString(n, "placeholder", "")
+	placeholder := SanitizeSingleLineText(propString(n, "placeholder", ""))
+	currentValue = SanitizeSingleLineText(currentValue)
 	border := lipgloss.RoundedBorder()
 	if r.Preset == PresetDense {
 		border = lipgloss.NormalBorder()
@@ -138,18 +139,20 @@ func (r *Renderer) renderActions(n document.Node, maxW int) string {
 	muted := lipgloss.NewStyle().Foreground(r.Theme.Muted)
 	parts := make([]string, 0, len(items))
 	for _, it := range items {
+		key := SanitizeSingleLineText(it.Key)
+		label := SanitizeSingleLineText(it.Label)
 		var p string
 		switch variant {
 		case "toolbar":
 			if r.Preset == PresetDense {
-				p = keyStyle.Render("["+it.Key+"]") + " " + labelStyle.Render(it.Label)
+				p = keyStyle.Render("["+key+"]") + " " + labelStyle.Render(label)
 			} else {
-				p = muted.Render("[") + keyStyle.Render(" "+it.Key+" ") + labelStyle.Render(it.Label) + muted.Render(" ]")
+				p = muted.Render("[") + keyStyle.Render(" "+key+" ") + labelStyle.Render(label) + muted.Render(" ]")
 			}
 		case "list":
-			p = keyStyle.Render("["+it.Key+"]") + " " + labelStyle.Render(it.Label)
+			p = keyStyle.Render("["+key+"]") + " " + labelStyle.Render(label)
 		default:
-			p = muted.Render("[") + keyStyle.Render(it.Key) + muted.Render(":") + labelStyle.Render(it.Label) + muted.Render("]")
+			p = muted.Render("[") + keyStyle.Render(key) + muted.Render(":") + labelStyle.Render(label) + muted.Render("]")
 		}
 		parts = append(parts, p)
 	}
@@ -169,7 +172,7 @@ func (r *Renderer) renderProgress(n document.Node, maxW int, state RenderState) 
 	if val > 1 {
 		val = 1
 	}
-	label := propString(n, "label", "")
+	label := SanitizeSingleLineText(propString(n, "label", ""))
 	variant := propString(n, "variant", "bar")
 	status := propString(n, "state", "normal")
 	if status == "success" {
@@ -226,6 +229,14 @@ func (r *Renderer) renderTable(n document.Node, focused bool, selection a2runtim
 	var rows [][]string
 	_ = json.Unmarshal(n.Props["columns"], &cols)
 	_ = json.Unmarshal(n.Props["rows"], &rows)
+	for i := range cols {
+		cols[i].Title = SanitizeSingleLineText(cols[i].Title)
+	}
+	for i := range rows {
+		for j := range rows[i] {
+			rows[i][j] = SanitizeSingleLineText(rows[i][j])
+		}
+	}
 	selectable := propBool(n, "selectable", false)
 	variant := propString(n, "variant", "normal")
 	if len(cols) == 0 {
@@ -351,10 +362,11 @@ func (r *Renderer) renderViewport(ctx renderContext, n document.Node, w, h int) 
 	wrap := propBool(n, "wrap", true)
 	parts := make([]string, 0, len(n.Children)+1)
 	if n.Text != "" {
+		sanitizedText := SanitizeText(n.Text)
 		if wrap {
-			parts = append(parts, wrapPlainText(n.Text, w))
+			parts = append(parts, wrapPlainText(sanitizedText, w))
 		} else {
-			logical := strings.Split(n.Text, "\n")
+			logical := strings.Split(sanitizedText, "\n")
 			for i := range logical {
 				logical[i] = fitPlainText(logical[i], w)
 			}

@@ -51,7 +51,7 @@ That run passed unit/conformance, race, vet, wire fuzz, document fuzz, and IPC f
 | Default UDS directory/socket permissions restrict ordinary cross-user access. | **LIMITED** | `ipc/socket.go` | `go test ./ipc` socket mode/stale-socket tests | Same UID and root are not isolated. Unix mode bits are not app-level authentication. |
 | A live daemon socket is not blindly removed during startup. | **VERIFIED** | `ipc.ListenUnix` active-probe + startup lock | socket startup/stress tests | Depends on normal Unix filesystem/socket semantics. |
 | HTTP/MCP requests are authenticated. | **UNVERIFIED / CURRENTLY FALSE AS A GENERAL CLAIM** | `daemon/mcp.go`, `cmd/a2uid/main.go` show protocol validation but no authentication layer | code review; bind-address review | Current safe deployment guidance is loopback/dev only. Session ID and MCP headers are not credentials. |
-| Agent-provided terminal text cannot execute ANSI/OSC terminal controls. | **UNVERIFIED** | `adapter/bubbletea/render_components.go` passes untrusted text through wrapping/Lip Gloss without a dedicated A2UI sanitizer proof | required regression suite not implemented | ESC/CSI/OSC/C1 and fragmented sequences need explicit tests/policy before claiming safety. |
+| Agent-provided terminal text cannot execute ANSI/OSC terminal controls. | **VERIFIED** | `adapter/bubbletea/sanitize.go`, `render_helpers.go`, `render_components.go` | `TestSanitizeTextNeutralizesTerminalControls`, `TestRendererSanitizesInjectedDocumentNodes`, `TestSanitizeSplitSequenceAcrossAppends` | Strips ESC/CSI/OSC (incl. OSC 52 clipboard & OSC 8), C0/C1, Bidi overrides before styling and rendering. |
 | Unknown host action IDs cannot execute a handler. | **VERIFIED** | `runtime/actions.go` registry lookup | action tests / `action.not_permitted` behavior | A registered handler is trusted host code and may have broad side effects. |
 | Action timeout forcibly stops all handler work and rolls back effects. | **UNVERIFIED / NOT GUARANTEED** | `runtime/actions.go` uses context timeout | code review | Cancellation is cooperative; handler goroutine/side effects are not forcibly rolled back. |
 | A stale renderer acknowledgement cannot publish a newer commit generation. | **VERIFIED** | `daemon/publication.go`, Engine publication-generation APIs, monotonic IPC snapshots | release-hardening publication tests, race suite | ACK proves renderer path, not human attention. |
@@ -236,26 +236,26 @@ wrapping / Lip Gloss
 terminal output
 ```
 
-No dedicated A2UI escape sanitizer was established in this review.
+A dedicated A2UI escape sanitizer is implemented in `adapter/bubbletea/sanitize.go` and applied in `render_helpers.go` and `render_components.go`.
 
-Required future regression matrix:
+Verified regression matrix:
 
 ```text
-ESC
-CSI cursor/control sequences
-OSC 8 hyperlinks
-OSC 52 clipboard
-C1 controls
-CR / BS
-split sequence across text appends
-text props
-viewport text
-input value/placeholder
-table cells/titles
-action labels
+ESC                             -> stripped
+CSI cursor/control sequences    -> stripped (clear screen, cursor jumps, styling)
+OSC 8 hyperlinks                -> stripped (visible text preserved, hidden URI removed)
+OSC 52 clipboard                -> stripped (both BEL and ST terminators)
+C1 controls (8-bit CSI/OSC)     -> stripped
+CR / BS / C0 controls           -> CR converted to LF (avoids line overwrite), C0 dropped (except \n, \t)
+split sequence across appends   -> stripped across propString + node Text boundaries
+text props                      -> sanitized via propString
+viewport text                   -> sanitized before wrapping and slicing
+input value/placeholder         -> sanitized via SanitizeSingleLineText
+table cells/titles              -> sanitized via SanitizeSingleLineText
+action labels                   -> sanitized via SanitizeSingleLineText
 ```
 
-Until that exists, mark terminal-control isolation **UNVERIFIED**.
+Verified by `TestSanitizeTextNeutralizesTerminalControls`, `TestRendererSanitizesInjectedDocumentNodes`, and `TestSanitizeSplitSequenceAcrossAppends`.
 
 ## Host-action evidence
 

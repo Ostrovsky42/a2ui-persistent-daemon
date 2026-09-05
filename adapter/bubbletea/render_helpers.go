@@ -11,9 +11,9 @@ import (
 func propString(n document.Node, key, fallback string) string {
 	var v string
 	if raw := n.Props[key]; len(raw) > 0 && json.Unmarshal(raw, &v) == nil {
-		return v
+		return SanitizeText(v)
 	}
-	return fallback
+	return SanitizeText(fallback)
 }
 func propInt(n document.Node, key string, fallback int) int {
 	var v int

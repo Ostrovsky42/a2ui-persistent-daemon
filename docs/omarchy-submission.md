@@ -47,6 +47,7 @@ Implemented in the A2UI repository:
 - strict JSON decoding and transactional Document mutation;
 - finite retained-state/resource limits;
 - developer smoke/reattach/startup-stress harness;
+- verified terminal-control and OSC escape sanitization;
 - protocol, implementation and security documentation.
 
 ## What does not exist yet
@@ -63,7 +64,6 @@ Do not pitch these as finished:
 - ANSI/Base16 system-theme mapping;
 - Wayland clipboard integration;
 - Vim `hjkl` navigation;
-- terminal-control sanitization proof;
 - authenticated remote HTTP ingress;
 - disk persistence across daemon restart.
 
