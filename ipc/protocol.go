@@ -16,6 +16,7 @@ const (
 	KindInteraction    Kind = "interaction"
 	KindFramePublished Kind = "frame_published"
 	KindDetach         Kind = "detach"
+	KindDetachAck      Kind = "detach_ack"
 	KindSnapshot       Kind = "snapshot"
 	KindError          Kind = "error"
 )
@@ -117,7 +118,11 @@ func validateMessage(m Message) *Error {
 			return NewError("ipc.invalid_message", "frame_published requires publication_generation")
 		}
 	case KindDetach:
-		// No payload required.
+		// No payload required. RequestID is optional for backward compatibility.
+	case KindDetachAck:
+		if m.RequestID == "" {
+			return NewError("ipc.invalid_message", "detach_ack requires request_id")
+		}
 	case KindSnapshot:
 		if m.Snapshot == nil {
 			return NewError("ipc.invalid_message", "snapshot requires payload")
