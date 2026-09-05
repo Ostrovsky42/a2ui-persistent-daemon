@@ -1,0 +1,6 @@
+{"v":1,"session":"demo-ui","kind":"hello","seq":0,"payload":{"versions":[1],"features":["commit-barrier","incremental-props","bounded-resources"]}}
+{"v":1,"session":"demo-ui","kind":"operation","seq":1,"payload":{"v":1,"seq":1,"op":"upsert","id":"main","type":"box","parent":"root","props":{"dir":"col","gap":1,"border":"rounded"}}}
+{"v":1,"session":"demo-ui","kind":"operation","seq":2,"payload":{"v":1,"seq":2,"op":"upsert","id":"status","type":"text","parent":"main","props":{"text":"Device ready","style":{"fg":"primary","bold":true}}}}
+{"v":1,"session":"demo-ui","kind":"operation","seq":3,"payload":{"v":1,"seq":3,"op":"upsert","id":"cmd","type":"input","parent":"main","props":{"placeholder":"command","action":"cmd.submit"}}}
+{"v":1,"session":"demo-ui","kind":"operation","seq":4,"payload":{"v":1,"seq":4,"op":"focus","id":"cmd"}}
+{"v":1,"session":"demo-ui","kind":"operation","seq":5,"payload":{"v":1,"seq":5,"op":"commit","frame":"boot"}}

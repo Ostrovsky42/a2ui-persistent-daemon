@@ -1,0 +1,4 @@
+{"v":1,"session":"demo-ui","kind":"hello_ack","seq":0,"payload":{"version":1,"features":["bounded-resources","commit-barrier","incremental-props"],"components":["box","text","viewport","table","input","actions","progress"],"limits":{"max_message_bytes":1048576,"max_nodes":2048,"max_depth":32,"max_children":512,"max_text_bytes_per_node":262144,"max_total_text_bytes":2097152,"max_table_rows":4096,"max_table_columns":64,"max_pending_events":256,"max_pending_mutations":256,"max_inflight_actions":32,"max_datagram_bytes":1200,"max_document_bytes":8388608}}}
+{"v":1,"session":"demo-ui","kind":"event","seq":1,"payload":{"v":1,"seq":1,"ev":"resize","row":0,"w":120,"h":40}}
+{"v":1,"session":"demo-ui","kind":"event","seq":2,"payload":{"v":1,"seq":2,"ev":"committed","row":0,"revision":3,"through_seq":5,"frame":"boot"}}
+{"v":1,"session":"demo-ui","kind":"event","seq":3,"payload":{"v":1,"seq":3,"ev":"select","id":"jobs","row":1,"row_id":"job-b","action":"open_job"}}

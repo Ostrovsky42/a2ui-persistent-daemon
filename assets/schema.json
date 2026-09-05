@@ -1,0 +1,1193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://a2ui.dev/schema/v1.json",
+  "title": "A2UI v1 wire record",
+  "description": "A2UI v1 hardened wire schema. Context-dependent props patches receive semantic validation against the target node type in the runtime.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/legacyOperation"
+    },
+    {
+      "$ref": "#/$defs/envelope"
+    },
+    {
+      "$ref": "#/$defs/event"
+    }
+  ],
+  "$defs": {
+    "nodeType": {
+      "enum": [
+        "box",
+        "text",
+        "viewport",
+        "table",
+        "input",
+        "actions",
+        "progress"
+      ]
+    },
+    "colorToken": {
+      "enum": [
+        "primary",
+        "warn",
+        "error",
+        "muted"
+      ]
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fg": {
+          "$ref": "#/$defs/colorToken"
+        },
+        "bg": {
+          "$ref": "#/$defs/colorToken"
+        },
+        "bold": {
+          "type": "boolean"
+        },
+        "dim": {
+          "type": "boolean"
+        }
+      }
+    },
+    "boxProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "enum": [
+            "col",
+            "row"
+          ],
+          "default": "col"
+        },
+        "padding": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "gap": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "border": {
+          "enum": [
+            "none",
+            "rounded",
+            "normal"
+          ],
+          "default": "none"
+        },
+        "style": {
+          "$ref": "#/$defs/style"
+        },
+        "flex": {
+          "$ref": "#/$defs/flex"
+        },
+        "variant": {
+          "enum": [
+            "plain",
+            "panel",
+            "card",
+            "section"
+          ],
+          "default": "plain"
+        },
+        "align": {
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "stretch"
+          ],
+          "default": "start"
+        },
+        "responsive": {
+          "enum": [
+            "none",
+            "stack"
+          ],
+          "default": "none"
+        }
+      }
+    },
+    "textProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "default": ""
+        },
+        "style": {
+          "$ref": "#/$defs/style"
+        },
+        "flex": {
+          "$ref": "#/$defs/flex"
+        },
+        "variant": {
+          "enum": [
+            "body",
+            "title",
+            "subtitle",
+            "label",
+            "code",
+            "muted"
+          ],
+          "default": "body"
+        }
+      }
+    },
+    "viewportProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        },
+        "wrap": {
+          "type": "boolean",
+          "default": true
+        },
+        "flex": {
+          "$ref": "#/$defs/flex"
+        },
+        "follow_tail": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrollable": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "tableProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/column"
+          },
+          "default": []
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default": []
+        },
+        "selectable": {
+          "type": "boolean",
+          "default": false
+        },
+        "row_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "action": {
+          "type": "string",
+          "default": ""
+        },
+        "flex": {
+          "$ref": "#/$defs/flex"
+        },
+        "variant": {
+          "enum": [
+            "normal",
+            "compact",
+            "dense"
+          ],
+          "default": "normal"
+        }
+      }
+    },
+    "inputProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "placeholder": {
+          "type": "string",
+          "default": ""
+        },
+        "value": {
+          "type": "string",
+          "default": ""
+        },
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "One-shot mutation policy; never retained in authoritative props."
+        },
+        "action": {
+          "type": "string",
+          "default": ""
+        },
+        "flex": {
+          "$ref": "#/$defs/flex"
+        }
+      }
+    },
+    "actionItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "action"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "object"
+        }
+      }
+    },
+    "actionsProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/actionItem"
+          },
+          "default": []
+        },
+        "flex": {
+          "$ref": "#/$defs/flex"
+        },
+        "variant": {
+          "enum": [
+            "inline",
+            "toolbar",
+            "list"
+          ],
+          "default": "inline"
+        }
+      }
+    },
+    "progressProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "label": {
+          "type": "string",
+          "default": ""
+        },
+        "flex": {
+          "$ref": "#/$defs/flex"
+        },
+        "variant": {
+          "enum": [
+            "bar",
+            "compact",
+            "spinner"
+          ],
+          "default": "bar"
+        },
+        "state": {
+          "enum": [
+            "normal",
+            "loading",
+            "success",
+            "error"
+          ],
+          "default": "normal"
+        }
+      }
+    },
+    "upsertBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "type"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "upsert"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "box"
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "integer"
+        },
+        "props": {
+          "$ref": "#/$defs/boxProps"
+        }
+      }
+    },
+    "upsertText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "type"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "upsert"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "text"
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "integer"
+        },
+        "props": {
+          "$ref": "#/$defs/textProps"
+        }
+      }
+    },
+    "upsertViewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "type"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "upsert"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "viewport"
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "integer"
+        },
+        "props": {
+          "$ref": "#/$defs/viewportProps"
+        }
+      }
+    },
+    "upsertTable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "type"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "upsert"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "table"
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "integer"
+        },
+        "props": {
+          "$ref": "#/$defs/tableProps"
+        }
+      }
+    },
+    "upsertInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "type"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "upsert"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "input"
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "integer"
+        },
+        "props": {
+          "$ref": "#/$defs/inputProps"
+        }
+      }
+    },
+    "upsertActions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "type"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "upsert"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "actions"
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "integer"
+        },
+        "props": {
+          "$ref": "#/$defs/actionsProps"
+        }
+      }
+    },
+    "upsertProgress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "type"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "upsert"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "progress"
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "integer"
+        },
+        "props": {
+          "$ref": "#/$defs/progressProps"
+        }
+      }
+    },
+    "upsertOperation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/upsertBox"
+        },
+        {
+          "$ref": "#/$defs/upsertText"
+        },
+        {
+          "$ref": "#/$defs/upsertViewport"
+        },
+        {
+          "$ref": "#/$defs/upsertTable"
+        },
+        {
+          "$ref": "#/$defs/upsertInput"
+        },
+        {
+          "$ref": "#/$defs/upsertActions"
+        },
+        {
+          "$ref": "#/$defs/upsertProgress"
+        }
+      ]
+    },
+    "propsOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "props"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "props"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "props": {
+          "type": "object",
+          "description": "Validated semantically against the current node type."
+        }
+      }
+    },
+    "textOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id",
+        "text"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "text"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "removeOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "remove"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focusOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op",
+        "id"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "focus"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "commitOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "seq",
+        "op"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "op": {
+          "const": "commit"
+        },
+        "frame": {
+          "type": "string"
+        }
+      }
+    },
+    "legacyOperation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/upsertOperation"
+        },
+        {
+          "$ref": "#/$defs/propsOperation"
+        },
+        {
+          "$ref": "#/$defs/textOperation"
+        },
+        {
+          "$ref": "#/$defs/removeOperation"
+        },
+        {
+          "$ref": "#/$defs/focusOperation"
+        },
+        {
+          "$ref": "#/$defs/commitOperation"
+        }
+      ]
+    },
+    "envelope": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/helloEnvelope"
+        },
+        {
+          "$ref": "#/$defs/helloAckEnvelope"
+        },
+        {
+          "$ref": "#/$defs/operationEnvelope"
+        },
+        {
+          "$ref": "#/$defs/eventEnvelope"
+        },
+        {
+          "$ref": "#/$defs/telemetryEnvelope"
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "ev",
+        "seq"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ev": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "msg": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "invocation_id": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "row": {
+          "type": "integer"
+        },
+        "row_id": {
+          "type": "string"
+        },
+        "w": {
+          "type": "integer"
+        },
+        "h": {
+          "type": "integer"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "through_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frame": {
+          "type": "string"
+        },
+        "args": {},
+        "related_seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_message_bytes",
+        "max_document_bytes",
+        "max_nodes",
+        "max_depth",
+        "max_children",
+        "max_text_bytes_per_node",
+        "max_total_text_bytes",
+        "max_table_rows",
+        "max_table_columns",
+        "max_pending_events",
+        "max_pending_mutations",
+        "max_inflight_actions",
+        "max_datagram_bytes"
+      ],
+      "properties": {
+        "max_message_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_document_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_nodes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_children": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_text_bytes_per_node": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_total_text_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_table_rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_table_columns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_pending_events": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_pending_mutations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_inflight_actions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_datagram_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "helloPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "versions"
+      ],
+      "properties": {
+        "versions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "helloAckPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "features",
+        "components",
+        "limits"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "components": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nodeType"
+          }
+        },
+        "limits": {
+          "$ref": "#/$defs/limits"
+        }
+      }
+    },
+    "helloEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "session": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "hello"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "payload": {
+          "$ref": "#/$defs/helloPayload"
+        }
+      }
+    },
+    "helloAckEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "session": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "hello_ack"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "payload": {
+          "$ref": "#/$defs/helloAckPayload"
+        }
+      }
+    },
+    "operationEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "kind",
+        "seq",
+        "payload"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "session": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "operation"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "payload": {
+          "$ref": "#/$defs/legacyOperation"
+        }
+      }
+    },
+    "eventEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "kind",
+        "seq",
+        "payload"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "session": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "event"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "payload": {
+          "$ref": "#/$defs/event"
+        }
+      }
+    },
+    "telemetryEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "kind",
+        "seq",
+        "payload"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "session": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "telemetry"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "payload": {
+          "type": "object"
+        }
+      }
+    },
+    "flex": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "grow": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "basis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_width": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{"v":1,"seq":1,"op":"upsert","id":"main","type":"box","parent":"root","props":{"dir":"col","gap":0}}
+{"v":1,"seq":2,"op":"upsert","id":"title","type":"text","parent":"main","props":{"text":"A2UI"}}
+{"v":1,"seq":3,"op":"upsert","id":"cmd","type":"input","parent":"main","props":{"placeholder":"command","value":"","action":"cmd.submit"}}
+{"v":1,"seq":4,"op":"props","id":"main","props":{"gap":2}}
+{"v":1,"seq":5,"op":"text","id":"title","text":"!"}
+{"v":1,"seq":6,"op":"focus","id":"cmd"}
+{"v":1,"seq":7,"op":"commit","frame":"basic"}
