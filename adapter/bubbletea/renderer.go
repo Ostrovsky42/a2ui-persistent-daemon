@@ -212,6 +212,11 @@ func (r *Renderer) renderBox(ctx renderContext, n document.Node, w, h int) strin
 }
 
 func (r *Renderer) decorateBox(n document.Node, variant string, padding int, border layout.Border, inner string) string {
+	rawStyle := n.Props["style"]
+	if padding == 0 && (border == layout.BorderNone || border == "") && len(rawStyle) == 0 && !(variant == "panel" && r.Preset == PresetDashboard) {
+		return inner
+	}
+
 	st := lipgloss.NewStyle().Padding(padding)
 	if border != layout.BorderNone && border != "" {
 		borderColor := r.Theme.Border
@@ -223,7 +228,7 @@ func (r *Renderer) decorateBox(n document.Node, variant string, padding int, bor
 	if variant == "panel" && r.Preset == PresetDashboard {
 		st = st.Foreground(r.Theme.Text)
 	}
-	st = applyRawStyle(st, n.Props["style"], r.Theme)
+	st = applyRawStyle(st, rawStyle, r.Theme)
 	return st.Render(inner)
 }
 
