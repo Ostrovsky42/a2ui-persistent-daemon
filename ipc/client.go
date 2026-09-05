@@ -110,6 +110,7 @@ func clonePresentation(in engine.PresentationSnapshot) engine.PresentationSnapsh
 		InputValues:           make(map[string]string, len(in.InputValues)),
 		TableSelections:       make(map[string]a2runtime.TableSelection, len(in.TableSelections)),
 		Bindings:              make(map[string]a2runtime.Binding, len(in.Bindings)),
+		RenderGeneration:      in.RenderGeneration,
 		PublicationGeneration: in.PublicationGeneration,
 		PublicationPending:    in.PublicationPending,
 	}
@@ -130,6 +131,16 @@ func (c *Client) Snapshot() engine.PresentationSnapshot {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return clonePresentation(c.snapshot)
+}
+
+func (c *Client) acceptSnapshot(in engine.PresentationSnapshot) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if in.RenderGeneration < c.snapshot.RenderGeneration {
+		return false
+	}
+	c.snapshot = clonePresentation(in)
+	return true
 }
 
 func (c *Client) ClientID() string {
@@ -186,13 +197,15 @@ func (c *Client) readLoop() {
 				c.finish()
 				return
 			}
-			c.mu.Lock()
-			c.snapshot = clonePresentation(msg.Snapshot.Presentation)
-			c.mu.Unlock()
-			c.signalUpdate()
+			accepted := c.acceptSnapshot(msg.Snapshot.Presentation)
+			if accepted {
+				c.signalUpdate()
+			}
 			if msg.RequestID != "" {
 				c.resolve(msg.RequestID, nil)
 			}
+		case KindDetachAck:
+			c.resolve(msg.RequestID, nil)
 		case KindError:
 			if msg.Error == nil {
 				c.failAll(NewError("ipc.invalid_message", "error payload missing"))
@@ -255,13 +268,18 @@ func (c *Client) Close() error {
 		return nil
 	default:
 	}
-	_ = c.writer.Write(Message{V: Version, Kind: KindDetach})
+	err := c.requestMessage(Message{V: Version, Kind: KindDetach})
 	c.finish()
-	return nil
+	return err
 }
 
 func (c *Client) request(in Interaction) error {
+	return c.requestMessage(Message{V: Version, Kind: KindInteraction, Interaction: &in})
+}
+
+func (c *Client) requestMessage(msg Message) error {
 	id := fmt.Sprintf("r-%d", c.nextReq.Add(1))
+	msg.RequestID = id
 	response := make(chan clientResponse, 1)
 	c.pendingMu.Lock()
 	select {
@@ -273,7 +291,7 @@ func (c *Client) request(in Interaction) error {
 	c.pending[id] = response
 	c.pendingMu.Unlock()
 
-	if err := c.writer.Write(Message{V: Version, Kind: KindInteraction, RequestID: id, Interaction: &in}); err != nil {
+	if err := c.writer.Write(msg); err != nil {
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
@@ -291,7 +309,7 @@ func (c *Client) request(in Interaction) error {
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return NewError("ipc.request_timeout", "daemon interaction response timed out")
+		return NewError("ipc.request_timeout", "daemon request timed out")
 	case <-c.closed:
 		return NewError("ipc.connection_closed", "daemon connection closed")
 	}
