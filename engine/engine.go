@@ -18,6 +18,7 @@ type PresentationSnapshot struct {
 	InputValues           map[string]string                   `json:"input_values"`
 	TableSelections       map[string]a2runtime.TableSelection `json:"table_selections"`
 	Bindings              map[string]a2runtime.Binding        `json:"bindings"`
+	RenderGeneration      uint64                              `json:"render_generation"`
 	PublicationGeneration uint64                              `json:"publication_generation"`
 	PublicationPending    bool                                `json:"publication_pending"`
 }
@@ -101,6 +102,7 @@ func (e *Engine) PresentationSnapshot() PresentationSnapshot {
 		InputValues:           inputs,
 		TableSelections:       selections,
 		Bindings:              bindings,
+		RenderGeneration:      e.state.RenderGeneration,
 		PublicationGeneration: e.publicationGeneration,
 		PublicationPending:    e.needsPublishLocked(),
 	}
