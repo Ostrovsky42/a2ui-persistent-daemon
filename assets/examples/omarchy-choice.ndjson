@@ -1,0 +1,12 @@
+{"v":1,"session":"omarchy-choice","kind":"hello","seq":0,"payload":{"versions":[1],"features":["commit-barrier","incremental-props","bounded-resources"]}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":1,"payload":{"v":1,"seq":1,"op":"upsert","id":"choice-panel","type":"box","parent":"root","props":{"dir":"col","gap":1,"border":"rounded","variant":"panel"}}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":2,"payload":{"v":1,"seq":2,"op":"upsert","id":"choice-title","type":"text","parent":"choice-panel","props":{"text":"Choose a deployment target","variant":"title"}}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":3,"payload":{"v":1,"seq":3,"op":"upsert","id":"targets","type":"table","parent":"choice-panel","props":{"columns":[{"title":"Target","width":18},{"title":"State","width":10}],"rows":[["staging","ready"],["production","guarded"]],"row_ids":["staging","production"],"selectable":true,"action":"deployment.select","variant":"compact"}}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":4,"payload":{"v":1,"seq":4,"op":"upsert","id":"comment","type":"input","parent":"choice-panel","props":{"placeholder":"optional comment","action":"deployment.comment"}}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":5,"payload":{"v":1,"seq":5,"op":"upsert","id":"activity","type":"viewport","parent":"choice-panel","props":{"height":4,"wrap":true,"follow_tail":true,"scrollable":true}}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":6,"payload":{"v":1,"seq":6,"op":"upsert","id":"temporary-note","type":"text","parent":"choice-panel","props":{"text":"Preparing choices...","variant":"muted"}}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":7,"payload":{"v":1,"seq":7,"op":"props","id":"choice-panel","props":{"gap":2}}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":8,"payload":{"v":1,"seq":8,"op":"text","id":"activity","text":"Choices loaded.\n"}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":9,"payload":{"v":1,"seq":9,"op":"remove","id":"temporary-note"}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":10,"payload":{"v":1,"seq":10,"op":"focus","id":"comment"}}
+{"v":1,"session":"omarchy-choice","kind":"operation","seq":11,"payload":{"v":1,"seq":11,"op":"commit","frame":"choice-ready"}}
