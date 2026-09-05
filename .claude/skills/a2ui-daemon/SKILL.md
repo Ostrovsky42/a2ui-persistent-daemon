@@ -16,4 +16,5 @@ lifecycle evidence.
 Do not copy MCP request payloads, create ad-hoc socket cleanup, or bypass the
 harness with a second daemon. A `client_busy` response means another terminal
 owns the only interactive lease. A full release claim requires both `make test`
-and `make test-race` to pass; report known failures rather than masking them.
+and `make test-race` to pass; report their fresh result rather than relying on
+earlier smoke evidence.

@@ -85,6 +85,5 @@ claim is allowed while `make test` or `make test-race` fails.
 
 Tooling changes require `make smoke-http`, `make smoke-ipc`, focused reattach
 and startup-stress tests, then `make test`, `make test-race`, and `go vet ./...`.
-The two existing Bubble Tea renderer failures are a separate release blocker;
-their observed result must be reported rather than hidden or weakened by this
-harness.
+Full release gates remain explicit: the harness must report their fresh
+observed result and must never weaken or replace them with smoke evidence.

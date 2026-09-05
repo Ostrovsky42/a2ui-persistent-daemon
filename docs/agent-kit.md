@@ -70,6 +70,5 @@ publication barrier survive a client reconnect. `test-startup-stress` runs
 ## Release status
 
 `make test` and `make test-race` remain release gates. At the current
-baseline, Bubble Tea renderer failures are known in those full gates. The
-agent must report them plainly; smoke or focused E2E success does not replace
-a full release verification.
+revision, the agent must run and report their fresh result; smoke or focused
+E2E success does not replace a full release verification.
