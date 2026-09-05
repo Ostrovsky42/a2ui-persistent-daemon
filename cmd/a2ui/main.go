@@ -11,6 +11,7 @@ import (
 
 	a2tea "a2ui/adapter/bubbletea"
 	"a2ui/ipc"
+	"a2ui/protocol"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -35,7 +36,7 @@ func main() {
 	}
 	path := resolveClientSocket(*socket, os.Getenv("XDG_RUNTIME_DIR"), os.Getuid())
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	client, perr := ipc.Dial(ctx, path, ipc.DefaultMaxMessageBytes)
+	client, perr := ipc.Dial(ctx, path, ipc.RecordLimit(protocol.DefaultLimits()))
 	cancel()
 	if perr != nil {
 		fmt.Fprintf(os.Stderr, "a2ui: %s\n", perr)
