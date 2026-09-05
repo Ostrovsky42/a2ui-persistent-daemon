@@ -10,7 +10,11 @@ import (
 )
 
 func TestShippedWireExamplesDecodeStrictly(t *testing.T) {
-	for _, path := range []string{"../assets/example-session.ndjson", "../assets/example-events.ndjson"} {
+	for _, path := range []string{
+		"../assets/example-session.ndjson",
+		"../assets/example-events.ndjson",
+		"../assets/examples/omarchy-choice.ndjson",
+	} {
 		f, err := os.Open(path)
 		if err != nil {
 			t.Fatal(err)
