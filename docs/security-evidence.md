@@ -23,7 +23,21 @@ Documentation/agent-kit work is being prepared on:
 feature/developer-agent-kit
 ```
 
-Before upstream submission, replace this section with the final reviewed SHA and rerun every command below on that exact revision.
+The detach/EOF lifecycle fix is commit:
+
+```text
+86482ed4c1be7c6b47dcce989c83619a55c8b46f
+```
+
+The first full branch verification including that fix and the shipped Omarchy fixture gate ran on:
+
+```text
+6ccbde7cf8ef2afa51a0fe257da6b3010cca97c3
+GitHub Actions run 33991597869
+Go 1.24.x
+```
+
+That run passed unit/conformance, race, vet, wire fuzz, document fuzz, and IPC fuzz. Before upstream submission, record the final reviewed SHA again after documentation-only edits and rerun the full gate.
 
 ## Claim matrix
 
@@ -41,7 +55,7 @@ Before upstream submission, replace this section with the final reviewed SHA and
 | Unknown host action IDs cannot execute a handler. | **VERIFIED** | `runtime/actions.go` registry lookup | action tests / `action.not_permitted` behavior | A registered handler is trusted host code and may have broad side effects. |
 | Action timeout forcibly stops all handler work and rolls back effects. | **UNVERIFIED / NOT GUARANTEED** | `runtime/actions.go` uses context timeout | code review | Cancellation is cooperative; handler goroutine/side effects are not forcibly rolled back. |
 | A stale renderer acknowledgement cannot publish a newer commit generation. | **VERIFIED** | `daemon/publication.go`, Engine publication-generation APIs, monotonic IPC snapshots | release-hardening publication tests, race suite | ACK proves renderer path, not human attention. |
-| `Client.Close()` always releases the single-client lease before returning. | **OPEN / FLAKY EVIDENCE** | synchronous detach/lease protocol, `ipc/release_hardening_test.go` | authoritative Epic 1 merge CI passed, but PR run `33991148698` later observed `TestClientCloseReleasesInteractiveLeaseBeforeReturning` fail at iteration 10 with `ipc.connection_closed` | Must reproduce and close before using "race-free reconnect" as release evidence. |
+| `Client.Close()` releases the single-client lease before a successful detach returns, without misreporting the expected post-ACK EOF as failure. | **VERIFIED** | server releases lease before `detach_ack`; `ipc.Client.requestMessage` gives an already-completed request response priority over `c.closed` | `TestClientCloseReleasesInteractiveLeaseBeforeReturning`; full unit + race in run `33991597869` | Unexpected transport loss before a response remains a real `ipc.connection_closed`. |
 | Closing the renderer preserves daemon-owned semantic state. | **VERIFIED WITH CURRENT E2E COVERAGE** | daemon owns Engine/Session; IPC initial snapshot | reattach E2E + persistent-daemon tests | No disk persistence is promised across daemon restart/reboot. |
 | `commit` means the human saw/read the frame. | **NOT A VALID CLAIM** | renderer sends exact-generation `frame_published` after its render path | publication tests | Terminal paint, window visibility, user attention, and comprehension are outside current proof. |
 
@@ -70,7 +84,9 @@ and required by:
 go test ./conformance -run TestOmarchyChoiceFixtureReplaysAllSixOperations
 ```
 
-The test proves that the fixture enters through the hardened envelope/session path, exercises every mutation type, removes its temporary node, leaves the expected focus, and creates a pending commit before publication.
+The shipped-example strict decoder also includes this fixture through `wire/examples_test.go`.
+
+The conformance test proves that the fixture enters through the hardened envelope/session path, exercises every mutation type, removes its temporary node, leaves the expected focus, and creates a pending commit before publication.
 
 It does **not** prove the final end-user CLI round trip because that CLI is not part of this documentation checkpoint.
 
@@ -135,7 +151,7 @@ go test ./ipc ./daemon
 go test -race ./ipc ./daemon
 ```
 
-The current branch also inherits Epic 1 tests for:
+The current branch inherits or adds tests for:
 
 - first client / `ipc.client_busy`;
 - lease release;
@@ -143,21 +159,42 @@ The current branch also inherits Epic 1 tests for:
 - exact publication generation;
 - duplicate/stale ACK behavior;
 - pending publication across reconnect;
-- large retained snapshot attach.
+- large retained snapshot attach;
+- request-bound detach followed by immediate server EOF.
 
-### Open lifecycle observation
+### Resolved lifecycle observation
 
-On 2026-09-05, PR workflow run `33991148698` at branch commit `d838a303...` failed:
+Two independent PR runs reproduced the same intermittent symptom before the fix:
 
 ```text
+run 33991148698
 TestClientCloseReleasesInteractiveLeaseBeforeReturning
-iteration 10:
+iteration 10
 ipc.connection_closed: daemon connection closed
 ```
 
-That run also contained the intentional RED for the missing Omarchy fixture. The IPC failure is unrelated to the fixture and must be treated as an independent intermittent defect until reproduced and closed.
+and later:
 
-Do not report the branch as fully release-green while this evidence is open.
+```text
+run 33991464459
+TestClientCloseReleasesInteractiveLeaseBeforeReturning
+iteration 75
+ipc.connection_closed: daemon connection closed
+```
+
+Root cause was client-side request completion ordering, not lease release ordering. The daemon correctly performed:
+
+```text
+release lease
+→ write detach_ack
+→ close connection
+```
+
+The client read loop could then decode the successful `detach_ack`, immediately observe the expected EOF, and close `c.closed`. Both the buffered successful request response and `c.closed` became ready; Go `select` was allowed to choose the closed branch and incorrectly return `ipc.connection_closed`.
+
+Fix `86482ed4...` makes an already-completed request-bound response authoritative when `c.closed` is simultaneously ready. A genuine EOF without a completed response still yields `ipc.connection_closed`.
+
+Full verification run `33991597869` on `6ccbde7...` passed both normal and race suites plus all fuzz smoke gates.
 
 ## HTTP access evidence
 
