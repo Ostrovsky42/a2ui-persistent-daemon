@@ -4,6 +4,8 @@ package ipc_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"a2ui/daemon"
@@ -42,5 +44,34 @@ func TestIPCRecordLimitCoversRetainedDocumentBudget(t *testing.T) {
 	}
 	if got < limits.MaxMessageBytes {
 		t.Fatalf("RecordLimit=%d must not be below agent record limit=%d", got, limits.MaxMessageBytes)
+	}
+}
+
+func TestClientCanAttachToSnapshotLargerThanAgentRecordLimit(t *testing.T) {
+	limits := protocol.DefaultLimits()
+	d := daemon.New("session", limits, nil)
+	path := startDaemonForClientTest(t, d)
+	negotiateAgent(t, d)
+
+	chunk := strings.Repeat("x", 220<<10)
+	seq := uint64(1)
+	for i := 0; i < 6; i++ {
+		id := fmt.Sprintf("large-%d", i)
+		agentOp(t, d, seq, protocol.Operation{Op: protocol.OpUpsert, ID: id, Type: protocol.NodeText, Parent: "root", Props: []byte(`{}`)})
+		seq++
+		agentOp(t, d, seq, protocol.Operation{Op: protocol.OpText, ID: id, Text: chunk})
+		seq++
+	}
+	if got := d.Engine.PresentationSnapshot().Document.TotalTextBytes; got <= limits.MaxMessageBytes {
+		t.Fatalf("test document must exceed agent record limit: text=%d agent_limit=%d", got, limits.MaxMessageBytes)
+	}
+
+	client, perr := ipc.Dial(context.Background(), path, ipc.RecordLimit(limits))
+	if perr != nil {
+		t.Fatalf("attach with large retained document: %v", perr)
+	}
+	defer client.Close()
+	if got := client.Snapshot().Document.TotalTextBytes; got <= limits.MaxMessageBytes {
+		t.Fatalf("large snapshot was not delivered: text=%d agent_limit=%d", got, limits.MaxMessageBytes)
 	}
 }
