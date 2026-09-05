@@ -285,7 +285,28 @@ func joinVertical(align string, gap int, views []string) string {
 	case "end":
 		pos = lipgloss.Right
 	}
-	return lipgloss.JoinVertical(pos, items...)
+	joined := lipgloss.JoinVertical(pos, items...)
+	if gap == 0 {
+		return joined
+	}
+
+	// Lip Gloss pads zero-width separator items to the joined block width.
+	// Keep alignment for real child content, but restore synthetic gap rows to
+	// truly empty lines so gap=N has exactly N blank rows and no frame-only
+	// trailing whitespace.
+	lines := strings.Split(joined, "\n")
+	line := 0
+	for i, view := range views {
+		line += lipgloss.Height(view)
+		if i == len(views)-1 {
+			break
+		}
+		for j := 0; j < gap && line < len(lines); j++ {
+			lines[line] = ""
+			line++
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func flexConstraint(n document.Node) layout.FlexConstraint {
