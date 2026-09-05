@@ -213,7 +213,7 @@ func (r *Renderer) renderBox(ctx renderContext, n document.Node, w, h int) strin
 
 func (r *Renderer) decorateBox(n document.Node, variant string, padding int, border layout.Border, inner string) string {
 	rawStyle := n.Props["style"]
-	if padding == 0 && (border == layout.BorderNone || border == "") && len(rawStyle) == 0 && !(variant == "panel" && r.Preset == PresetDashboard) {
+	if padding == 0 && (border == layout.BorderNone || border == "") && !n.ExplicitProps["style"] && !(variant == "panel" && r.Preset == PresetDashboard) {
 		return inner
 	}
 
