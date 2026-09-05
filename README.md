@@ -179,6 +179,12 @@ Daemon/client IPC is a **local control protocol**, not a new public A2UI operati
 
 `cmd/a2ui-runner` remains standalone and in-process for renderer development, conformance and CI.
 
+## Developer and agent workflow
+
+Run `make help` from the module root for the persistent-daemon developer
+commands. The reproducible daemon, smoke, focused-test, and agent operating
+workflow is documented in [docs/agent-kit.md](docs/agent-kit.md).
+
 ## Transport profiles
 
 ### NDJSON / stdio
