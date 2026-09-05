@@ -193,7 +193,9 @@ The current Omarchy-oriented documentation checkpoint is split by audience inste
 - [Omarchy maintainer proposal draft](docs/omarchy-submission.md) — demo, packaging and upstream gates;
 - [A2UI for Omarchy overview](references/OMARCHY.md) — pitch and links without duplicating the normative protocol.
 
-`references/PROTOCOL.md` remains normative. The documentation deliberately does **not** claim remote HTTP authentication or terminal escape sanitization until those boundaries have implementation evidence.
+`references/PROTOCOL.md` remains normative. The documentation deliberately does **not** claim HTTP caller authentication or terminal escape sanitization until those boundaries have implementation evidence.
+
+The documentation package is reviewable now, but it is not yet an upstream-ready Omarchy submission. The remaining product prerequisites are deliberately visible in the Manual and submission draft instead of being represented as existing features.
 
 ## Transport profiles
 
