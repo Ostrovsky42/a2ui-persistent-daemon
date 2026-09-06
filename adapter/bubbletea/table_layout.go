@@ -23,13 +23,14 @@ const (
 	tableReadablePreferredDenominator = 4
 )
 
-// TableLayoutInput contains only deterministic renderer inputs. Semantic
-// selection remains runtime-owned; SelectedRow is read-only input here.
+// TableLayoutInput contains only structural renderer inputs. Semantic
+// selection remains runtime-owned; SelectedRow is read-only input here. Row
+// values are deliberately absent so presentation mode cannot depend on streamed
+// cell content.
 type TableLayoutInput struct {
 	AvailableWidth  int
 	AvailableHeight int
 	Columns         []tableColumn
-	Rows            [][]string
 	RowCount        int
 	Selectable      bool
 	SelectedRow     int
@@ -52,7 +53,7 @@ type TableLayoutPlan struct {
 
 func planTableLayout(in TableLayoutInput) TableLayoutPlan {
 	widths := preferredTableWidths(in.Columns)
-	readable := minimumReadableTableWidths(in.Columns, in.Rows)
+	readable := minimumReadableTableWidths(in.Columns)
 	plan := TableLayoutPlan{
 		Mode:           TableModeFull,
 		ColumnWidths:   append([]int(nil), widths...),
@@ -181,12 +182,12 @@ func preferredTableWidths(cols []tableColumn) []int {
 }
 
 // minimumReadableTableWidths derives a stable tabular compression floor from
-// the column contract rather than from current row values. Preferred width is
-// the V1 upper target; the floor protects a conservative fraction of that
-// target plus the sanitized title width, capped by preferred width. Row values
-// are intentionally excluded so streaming/replacing data cannot make the same
-// schema and terminal geometry oscillate between presentation modes.
-func minimumReadableTableWidths(cols []tableColumn, _ [][]string) []int {
+// the column contract. Preferred width is the V1 upper target; the floor
+// protects a conservative fraction of that target plus the sanitized title
+// width, capped by preferred width. Row values are absent from this API so
+// streaming/replacing data cannot make the same schema and terminal geometry
+// oscillate between presentation modes.
+func minimumReadableTableWidths(cols []tableColumn) []int {
 	preferred := preferredTableWidths(cols)
 	floors := make([]int, len(cols))
 	for i, col := range cols {
