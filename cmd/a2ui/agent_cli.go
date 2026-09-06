@@ -58,12 +58,50 @@ Flags for status:
 `)
 }
 
+func reorderArgs(args []string) []string {
+	var flags []string
+	var positionals []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "-") {
+			flags = append(flags, arg)
+			if !strings.Contains(arg, "=") && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				if arg == "-verbose" || arg == "-raw" || arg == "-json" || arg == "--verbose" || arg == "--raw" || arg == "--json" {
+					continue
+				}
+				i++
+				flags = append(flags, args[i])
+			}
+		} else {
+			positionals = append(positionals, arg)
+		}
+	}
+	return append(flags, positionals...)
+}
+
+func discoverSession(server string, fallback string) string {
+	baseURL := strings.TrimRight(server, "/")
+	resp, err := (&http.Client{Timeout: 500 * time.Millisecond}).Get(baseURL + "/status")
+	if err != nil {
+		return fallback
+	}
+	defer resp.Body.Close()
+	var st struct {
+		Session string `json:"session"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&st) == nil && st.Session != "" {
+		return st.Session
+	}
+	return fallback
+}
+
 func runSend(args []string) {
 	fs := flag.NewFlagSet("send", flag.ExitOnError)
 	server := fs.String("server", defaultEnv("A2UI_SERVER", "http://127.0.0.1:8080"), "Daemon HTTP address")
-	session := fs.String("session", defaultEnv("A2UI_SESSION", "default"), "Session ID")
+	session := fs.String("session", defaultEnv("A2UI_SESSION", ""), "Session ID")
 	verbose := fs.Bool("verbose", false, "Print verbose sending progress")
-	_ = fs.Parse(args)
+	_ = fs.String("socket", "", "Unix socket path (ignored; send communicates via HTTP -server)")
+	_ = fs.Parse(reorderArgs(args))
 
 	filePath := "-"
 	if fs.NArg() > 0 {
@@ -103,11 +141,19 @@ func runSend(args []string) {
 		os.Exit(1)
 	}
 
-	// Detect session from first envelope if not explicitly overridden
-	if !explicitSession && len(lines) > 0 {
-		var firstEnv protocol.Envelope
-		if err := json.Unmarshal(lines[0], &firstEnv); err == nil && firstEnv.Session != "" {
-			*session = firstEnv.Session
+	// If session was not explicitly specified, query the daemon's active session first
+	if !explicitSession {
+		daemonSession := discoverSession(*server, "")
+		if daemonSession != "" {
+			*session = daemonSession
+		} else if len(lines) > 0 {
+			var firstEnv protocol.Envelope
+			if err := json.Unmarshal(lines[0], &firstEnv); err == nil && firstEnv.Session != "" {
+				*session = firstEnv.Session
+			}
+		}
+		if *session == "" {
+			*session = "default"
 		}
 	}
 	baseURL := strings.TrimRight(*server, "/")
@@ -231,11 +277,22 @@ func runSend(args []string) {
 func runWaitEvent(args []string) {
 	fs := flag.NewFlagSet("wait-event", flag.ExitOnError)
 	server := fs.String("server", defaultEnv("A2UI_SERVER", "http://127.0.0.1:8080"), "Daemon HTTP address")
-	session := fs.String("session", defaultEnv("A2UI_SESSION", "default"), "Session ID")
+	session := fs.String("session", defaultEnv("A2UI_SESSION", ""), "Session ID")
 	timeoutStr := fs.String("timeout", "30s", "Maximum wait duration")
 	filterType := fs.String("type", "", "Filter for event type (e.g. action, submit, committed)")
 	rawJSON := fs.Bool("raw", false, "Output full event as JSON")
-	_ = fs.Parse(args)
+	_ = fs.String("socket", "", "Unix socket path (ignored; wait-event communicates via HTTP -server)")
+	_ = fs.Parse(reorderArgs(args))
+
+	explicitSession := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "session" {
+			explicitSession = true
+		}
+	})
+	if !explicitSession {
+		*session = discoverSession(*server, "default")
+	}
 
 	timeout, err := time.ParseDuration(*timeoutStr)
 	if err != nil {
@@ -329,7 +386,8 @@ func runStatus(args []string) {
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
 	server := fs.String("server", defaultEnv("A2UI_SERVER", "http://127.0.0.1:8080"), "Daemon HTTP address")
 	rawJSON := fs.Bool("json", false, "Output raw JSON status")
-	_ = fs.Parse(args)
+	_ = fs.String("socket", "", "Unix socket path (ignored; status communicates via HTTP -server)")
+	_ = fs.Parse(reorderArgs(args))
 
 	baseURL := strings.TrimRight(*server, "/")
 	client := &http.Client{Timeout: 3 * time.Second}
