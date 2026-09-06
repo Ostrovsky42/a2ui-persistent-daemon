@@ -248,39 +248,33 @@ func (r *Renderer) renderTable(n document.Node, focused bool, selection a2runtim
 	if selectedRow < 0 {
 		selectedRow = 0
 	}
-	prefixW := 0
-	if selectable {
-		prefixW = 2
+
+	plan := planTableLayout(TableLayoutInput{
+		AvailableWidth: maxW,
+		Columns:        cols,
+		RowCount:       len(rows),
+		Selectable:     selectable,
+		SelectedRow:    selectedRow,
+		Variant:        variant,
+	})
+
+	switch plan.Mode {
+	case TableModeRecords:
+		return r.renderTableRecords(cols, rows, focused, selectable, selectedRow, maxW)
+	case TableModeMasterDetail:
+		return r.renderTableMasterDetail(cols, rows, focused, selectable, selectedRow, variant, plan)
+	default:
+		return r.renderTableGrid(cols, rows, focused, selectable, selectedRow, variant, plan.ColumnWidths)
+	}
+}
+
+func (r *Renderer) renderTableGrid(cols []tableColumn, rows [][]string, focused, selectable bool, selectedRow int, variant string, widths []int) string {
+	if len(cols) == 0 {
+		return ""
 	}
 	separator := " │ "
 	if variant == "compact" || variant == "dense" {
 		separator = " "
-	}
-	sepW := lipgloss.Width(separator) * maxInt(len(cols)-1, 0)
-	widths := make([]int, len(cols))
-	for i, c := range cols {
-		widths[i] = c.Width
-		if widths[i] < 3 {
-			widths[i] = 3
-		}
-	}
-	minimum := prefixW + sepW + 3*len(cols)
-	if maxW > 0 && minimum > maxW {
-		return r.renderTableRecords(cols, rows, focused, selectable, selectedRow, maxW)
-	}
-	if maxW > 0 {
-		for prefixW+sepW+sum(widths) > maxW {
-			best := -1
-			for i := range widths {
-				if widths[i] > 3 && (best < 0 || widths[i] > widths[best]) {
-					best = i
-				}
-			}
-			if best < 0 {
-				break
-			}
-			widths[best]--
-		}
 	}
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(r.Theme.Primary)
 	dividerStyle := lipgloss.NewStyle().Foreground(r.Theme.Muted)
@@ -289,8 +283,12 @@ func (r *Renderer) renderTable(n document.Node, focused bool, selection a2runtim
 	header := make([]string, len(cols))
 	divider := make([]string, len(cols))
 	for i, c := range cols {
-		header[i] = padPlain(c.Title, widths[i])
-		divider[i] = strings.Repeat("─", widths[i])
+		width := tableMinColumnWidth
+		if i < len(widths) {
+			width = maxInt(widths[i], tableMinColumnWidth)
+		}
+		header[i] = padPlain(c.Title, width)
+		divider[i] = strings.Repeat("─", width)
 	}
 	pre := ""
 	if selectable {
@@ -307,11 +305,15 @@ func (r *Renderer) renderTable(n document.Node, focused bool, selection a2runtim
 	for i, row := range rows {
 		cells := make([]string, len(cols))
 		for j := range cols {
-			v := ""
+			value := ""
 			if j < len(row) {
-				v = row[j]
+				value = row[j]
 			}
-			cells[j] = padPlain(v, widths[j])
+			width := tableMinColumnWidth
+			if j < len(widths) {
+				width = maxInt(widths[j], tableMinColumnWidth)
+			}
+			cells[j] = padPlain(value, width)
 		}
 		content := strings.Join(cells, separator)
 		rowPre := ""
@@ -325,6 +327,65 @@ func (r *Renderer) renderTable(n document.Node, focused bool, selection a2runtim
 			content = selectedStyle.Render(content)
 		}
 		lines = append(lines, rowPre+content)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (r *Renderer) renderTableMasterDetail(cols []tableColumn, rows [][]string, focused, selectable bool, selectedRow int, variant string, plan TableLayoutPlan) string {
+	if len(rows) == 0 || selectedRow < 0 || selectedRow >= len(rows) {
+		return r.renderTableRecords(cols, rows, focused, selectable, selectedRow, plan.LeftPaneWidth+tablePaneSeparatorWidth+plan.RightPaneWidth)
+	}
+
+	masterCols := make([]tableColumn, 0, len(plan.VisibleCols))
+	masterRows := make([][]string, len(rows))
+	preferred := preferredTableWidths(cols)
+	masterWidths := make([]int, 0, len(plan.VisibleCols))
+	for _, columnIndex := range plan.VisibleCols {
+		if columnIndex < 0 || columnIndex >= len(cols) {
+			continue
+		}
+		masterCols = append(masterCols, cols[columnIndex])
+		masterWidths = append(masterWidths, preferred[columnIndex])
+		for rowIndex, row := range rows {
+			value := ""
+			if columnIndex < len(row) {
+				value = row[columnIndex]
+			}
+			masterRows[rowIndex] = append(masterRows[rowIndex], value)
+		}
+	}
+	if len(masterCols) == 0 {
+		return r.renderTableRecords(cols, rows, focused, selectable, selectedRow, plan.LeftPaneWidth+tablePaneSeparatorWidth+plan.RightPaneWidth)
+	}
+
+	prefixW := 0
+	if selectable {
+		prefixW = tableSelectablePrefixW
+	}
+	separatorW := tableColumnSeparatorWidth(variant) * maxInt(len(masterCols)-1, 0)
+	budget := maxInt(plan.LeftPaneWidth-prefixW-separatorW, tableMinColumnWidth*len(masterCols))
+	masterWidths = shrinkTableWidths(masterWidths, budget)
+	master := r.renderTableGrid(masterCols, masterRows, focused, selectable, selectedRow, variant, masterWidths)
+	detail := r.renderTableDetail(cols, rows[selectedRow], plan.RightPaneWidth)
+	return lipgloss.JoinHorizontal(lipgloss.Top, master, strings.Repeat(" ", tablePaneSeparatorWidth), detail)
+}
+
+func (r *Renderer) renderTableDetail(cols []tableColumn, row []string, maxW int) string {
+	if maxW < 1 {
+		maxW = 1
+	}
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(r.Theme.Primary)
+	labelStyle := lipgloss.NewStyle().Bold(true).Foreground(r.Theme.Primary)
+	lines := []string{titleStyle.Render("Details")}
+	for i, col := range cols {
+		value := ""
+		if i < len(row) {
+			value = row[i]
+		}
+		label := fitPlainText(col.Title, maxInt(maxW-2, 1))
+		prefixW := lipgloss.Width(label) + 2
+		valueW := maxInt(maxW-prefixW, 1)
+		lines = append(lines, labelStyle.Render(label)+": "+fitPlainText(value, valueW))
 	}
 	return strings.Join(lines, "\n")
 }

@@ -1,0 +1,57 @@
+package bubbletea
+
+import "testing"
+
+func TestMinimumReadableTableWidthsUseStableColumnContract(t *testing.T) {
+	cols := agentActivityTableColumns()
+	got := minimumReadableTableWidths(cols)
+	want := []int{12, 11, 12, 27, 6}
+	if len(got) != len(want) {
+		t.Fatalf("readable width count: want %d, got %d (%v)", len(want), len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("readable width[%d]: want %d, got %d (all=%v)", i, want[i], got[i], got)
+		}
+	}
+}
+
+func TestPlanTableLayoutCompressesWithoutCrossingReadableFloors(t *testing.T) {
+	cols := agentActivityTableColumns()
+	rows := agentActivityTableRows()
+	plan := planTableLayout(TableLayoutInput{
+		AvailableWidth:  90,
+		AvailableHeight: 20,
+		Columns:         cols,
+		RowCount:        len(rows),
+		Selectable:      true,
+		SelectedRow:     1,
+	})
+
+	if plan.Mode != TableModeCompressed {
+		t.Fatalf("expected compressed mode while every column can remain readable, got %v", plan.Mode)
+	}
+	floors := minimumReadableTableWidths(cols)
+	for i, width := range plan.ColumnWidths {
+		if width < floors[i] {
+			t.Fatalf("column %d crossed readable floor: width=%d floor=%d", i, width, floors[i])
+		}
+	}
+}
+
+func TestPlanTableLayoutSwitchesToMasterDetailBeforeReadableFloorViolation(t *testing.T) {
+	cols := agentActivityTableColumns()
+	rows := agentActivityTableRows()
+	plan := planTableLayout(TableLayoutInput{
+		AvailableWidth:  80,
+		AvailableHeight: 20,
+		Columns:         cols,
+		RowCount:        len(rows),
+		Selectable:      true,
+		SelectedRow:     1,
+	})
+
+	if plan.Mode != TableModeMasterDetail {
+		t.Fatalf("expected master/detail once structural tabular floors no longer fit, got %v", plan.Mode)
+	}
+}
