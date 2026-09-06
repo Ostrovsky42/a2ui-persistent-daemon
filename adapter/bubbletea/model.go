@@ -305,11 +305,11 @@ func (m *Model) reconcileLocalState() {
 		}
 	}
 
-	// A table window is not a second user-controlled scroll state. It is a
-	// renderer-local cache of the top visible row, derived from semantic table
-	// selection plus current geometry. There are no table-scroll key bindings or
-	// tail-pin semantics; every reconciliation clamps/overwrites this cache from
-	// renderer metrics, and removal/non-selectability prunes it.
+	// A table window is not a second user-controlled scroll state. Its top row is
+	// adapter-local presentation continuity state: the previous offset participates
+	// in reconciliation together with runtime-owned selection and current geometry.
+	// The renderer constrains/clamps that state to a valid fixed point; it does not
+	// derive it history-free. Removal/non-selectability prunes the local state.
 	for id := range m.interaction.TableViewports {
 		n, ok := snapshot.Document.Nodes[id]
 		if !ok || n.Type != protocol.NodeTable || !propBool(n, "selectable", false) {
