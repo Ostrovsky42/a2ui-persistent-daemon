@@ -154,6 +154,9 @@ Tab — к таблице · ↑↓ — навигация · Enter — откр
 
 ## Скорость: что измерить
 
+The concrete prompts, data sets and exploratory baseline live in
+[latency and visualization test cases](2026-09-07-a2ui-latency-and-visualization-test-cases.md).
+
 Время tool call включает инфраструктуру выполнения и иногда ожидание человека;
 по нему нельзя выделить скорость renderer. Нужны отдельные измерения:
 
