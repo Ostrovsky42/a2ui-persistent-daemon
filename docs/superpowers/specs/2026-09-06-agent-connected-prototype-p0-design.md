@@ -48,7 +48,9 @@ A2UI V1 mutation sequencing belongs to one reliable agent stream. `Session.Accep
 
 ## Standard MCP compatibility
 
-Use the official Go MCP SDK (`github.com/modelcontextprotocol/go-sdk/mcp`) rather than a hand-written partial protocol implementation. P0 uses stdio because it is the most portable local harness transport. The SDK must support the current `2026-07-28` MCP revision while retaining legacy stdio compatibility for harnesses that negotiate an older supported revision.
+Use the official Go MCP SDK (`github.com/modelcontextprotocol/go-sdk/mcp`) rather than a hand-written partial protocol implementation. P0 uses stdio because it is the most portable local harness transport.
+
+The repository remains on Go 1.24. The newest SDK releases inspected during P0 had moved to Go 1.25, so this checkpoint intentionally pins `github.com/modelcontextprotocol/go-sdk v1.4.0`, the compatible official SDK line observed to retain Go 1.24 support. We do not claim that this library version implements every newer MCP revision. Automated tests prove standard `initialize`/`tools/list`/`tools/call` interoperability through the official SDK, and the real current Codex run is the authoritative harness-compatibility gate.
 
 The server exposes exactly three tools:
 
