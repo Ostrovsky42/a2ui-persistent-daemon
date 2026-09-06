@@ -102,6 +102,8 @@ A `hello` payload advertises supported protocol versions and optional features. 
 - accepted feature set;
 - finite resource limits.
 
+`hello_ack.components` is the complete node-type allowlist the endpoint guarantees it can accept and present for that session. An agent MUST NOT send a node type absent from this set. A newer agent that knows additional component types MUST degrade before sending by expressing the surface with advertised V1 components. Receiving an unknown node type remains a strict schema error. A2UI V1 does not define a generic node-level fallback field or catalog negotiation mechanism.
+
 If version intersection is empty, the error is fatal and the session does not become READY.
 
 A2UI session state is application state. When carried over modern MCP, it MUST be represented explicitly by the A2UI session handle; implementations MUST NOT assume an MCP transport session exists.
@@ -143,9 +145,19 @@ Existing node:
 
 - props are a **full replacement**;
 - omitted properties take type defaults;
-- same-type runtime-local state SHOULD be preserved;
-- `parent` change is rejected as `document.reparent_unsupported`;
+- omitted `parent` MUST keep the current parent;
+- an explicit `parent` equal to the current parent keeps that parent;
+- an explicit different `parent` MAY atomically relocate the surviving node and its complete subtree to that existing container;
+- omitted `index` with an unchanged parent MUST preserve sibling order;
+- omitted `index` after a parent change appends to the target parent's children;
+- explicit `index` reorders the node within the final target parent's children; an out-of-range index appends, matching creation semantics;
+- same-type relocation MUST preserve the identity of the node and its descendants, including renderer-independent runtime state keyed by surviving IDs;
+- moving a node under itself or one of its descendants MUST fail with `document.cycle`;
+- missing target parent MUST fail with `document.parent_not_found`;
+- non-container target parent MUST fail with `document.parent_not_container`;
 - type change is legal only if structural invariants remain valid and runtime-local state for that node is recreated.
+
+Topology, props, and type changes in one `upsert` are one transactional candidate. A failed relocation or resource/invariant check MUST leave the current authoritative Document unchanged.
 
 Invalid upsert MUST NOT reserve/poison the ID. A later valid upsert with the same ID can succeed.
 
