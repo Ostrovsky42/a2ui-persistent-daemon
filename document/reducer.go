@@ -69,13 +69,44 @@ func explicitPropKeys(raw json.RawMessage) map[string]bool {
 	return out
 }
 
+func removeChild(children []string, id string) []string {
+	out := make([]string, 0, len(children))
+	for _, child := range children {
+		if child != id {
+			out = append(out, child)
+		}
+	}
+	return out
+}
+
+func insertChild(children []string, id string, index *int) []string {
+	idx := len(children)
+	if index != nil && *index >= 0 && *index < len(children) {
+		idx = *index
+	}
+	children = append(children, "")
+	copy(children[idx+1:], children[idx:])
+	children[idx] = id
+	return children
+}
+
+func wouldCreateCycle(d Document, id, targetParent string) bool {
+	for current := targetParent; current != ""; {
+		if current == id {
+			return true
+		}
+		n, ok := d.Nodes[current]
+		if !ok {
+			return false
+		}
+		current = n.Parent
+	}
+	return false
+}
+
 func applyUpsert(d *Document, op protocol.Operation, eff *Effect, limits protocol.Limits) *protocol.Error {
 	if op.ID == "root" {
 		return protocol.NewError("document.root_immutable", "root cannot be upserted")
-	}
-	parentID := op.Parent
-	if parentID == "" {
-		parentID = "root"
 	}
 	normalized, policy, err := protocol.NormalizeProps(op.Type, op.Props, true)
 	if err != nil {
@@ -85,9 +116,43 @@ func applyUpsert(d *Document, op protocol.Operation, eff *Effect, limits protoco
 	explicit := explicitPropKeys(op.Props)
 	n, exists := d.Nodes[op.ID]
 	if exists {
-		if op.Parent != "" && op.Parent != n.Parent {
-			return protocol.NewError("document.reparent_unsupported", fmt.Sprintf("node %q cannot change parent", op.ID))
+		targetParentID := n.Parent
+		if op.Parent != "" {
+			targetParentID = op.Parent
 		}
+		parentChanged := targetParentID != n.Parent
+		topologyRequested := parentChanged || op.Index != nil
+		topologyChanged := false
+		if topologyRequested {
+			targetParent, ok := d.Nodes[targetParentID]
+			if !ok {
+				return protocol.NewError("document.parent_not_found", fmt.Sprintf("parent %q not found", targetParentID))
+			}
+			if wouldCreateCycle(*d, op.ID, targetParentID) {
+				return protocol.NewError("document.cycle", fmt.Sprintf("node %q cannot move under %q", op.ID, targetParentID))
+			}
+			if !targetParent.Type.Container() {
+				return protocol.NewError("document.parent_not_container", fmt.Sprintf("parent %q is %s", targetParentID, targetParent.Type))
+			}
+
+			oldParent := d.Nodes[n.Parent]
+			if parentChanged {
+				oldParent.Children = removeChild(oldParent.Children, op.ID)
+				targetParent.Children = insertChild(targetParent.Children, op.ID, op.Index)
+				d.Nodes[n.Parent] = oldParent
+				d.Nodes[targetParentID] = targetParent
+				n.Parent = targetParentID
+				topologyChanged = true
+			} else {
+				reordered := insertChild(removeChild(oldParent.Children, op.ID), op.ID, op.Index)
+				if !reflect.DeepEqual(oldParent.Children, reordered) {
+					oldParent.Children = reordered
+					d.Nodes[n.Parent] = oldParent
+					topologyChanged = true
+				}
+			}
+		}
+
 		typeChanged := n.Type != op.Type
 		if typeChanged {
 			if len(n.Children) > 0 && !op.Type.Container() {
@@ -109,11 +174,16 @@ func applyUpsert(d *Document, op protocol.Operation, eff *Effect, limits protoco
 		if err := validateTableLimits(n, limits); err != nil {
 			return err
 		}
-		if typeChanged || propsChanged || explicitChanged {
+		if topologyChanged || typeChanged || propsChanged || explicitChanged {
 			d.Nodes[op.ID] = n
 			eff.Changed = true
 		}
 		return nil
+	}
+
+	parentID := op.Parent
+	if parentID == "" {
+		parentID = "root"
 	}
 	p, ok := d.Nodes[parentID]
 	if !ok {
@@ -124,13 +194,7 @@ func applyUpsert(d *Document, op protocol.Operation, eff *Effect, limits protoco
 	}
 	n = Node{ID: op.ID, Type: op.Type, Parent: parentID, Props: normalized, ExplicitProps: explicit}
 	d.Nodes[op.ID] = n
-	idx := len(p.Children)
-	if op.Index != nil && *op.Index >= 0 && *op.Index < len(p.Children) {
-		idx = *op.Index
-	}
-	p.Children = append(p.Children, "")
-	copy(p.Children[idx+1:], p.Children[idx:])
-	p.Children[idx] = op.ID
+	p.Children = insertChild(p.Children, op.ID, op.Index)
 	d.Nodes[parentID] = p
 	eff.Changed = true
 	return validateTableLimits(n, limits)
