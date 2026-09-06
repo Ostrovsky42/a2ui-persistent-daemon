@@ -48,7 +48,10 @@ func (r *Renderer) RenderTreeWithState(doc document.Document, focusedID string, 
 // interaction mechanics into a terminal frame. Renderer itself retains no
 // mutable session state.
 func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs map[string]string, tableSelections map[string]a2runtime.TableSelection, interaction InteractionState, availW, availH int, state RenderState) RenderResult {
-	result := RenderResult{Viewports: make(map[string]ViewportMetrics)}
+	result := RenderResult{
+		Viewports: make(map[string]ViewportMetrics),
+		Tables:    make(map[string]TableViewportMetrics),
+	}
 	if _, ok := doc.Nodes["root"]; !ok {
 		return result
 	}
@@ -66,6 +69,7 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 		interaction:     interaction,
 		state:           state,
 		viewports:       result.Viewports,
+		tables:          result.Tables,
 	}
 	result.Frame = r.renderNode(ctx, "root", availW, availH)
 	return result
@@ -79,6 +83,7 @@ type renderContext struct {
 	interaction     InteractionState
 	state           RenderState
 	viewports       map[string]ViewportMetrics
+	tables          map[string]TableViewportMetrics
 }
 
 func (r *Renderer) renderNode(ctx renderContext, id string, w, h int) string {
@@ -108,7 +113,14 @@ func (r *Renderer) renderNode(ctx renderContext, id string, w, h int) string {
 		if !ok {
 			selection = a2runtime.TableSelection{Index: 0}
 		}
-		return r.renderTable(n, ctx.focusedID == id, selection, w)
+		rowOffset := 0
+		if ctx.interaction.TableViewports != nil {
+			if local, ok := ctx.interaction.TableViewports[id]; ok {
+				rowOffset = local.Offset
+			}
+		}
+		ctx.tables[id] = resolveTableViewportMetrics(n, selection, w, h, rowOffset)
+		return r.renderTableWindowed(n, ctx.focusedID == id, selection, w, h, rowOffset)
 	case protocol.NodeViewport:
 		return r.renderViewport(ctx, n, w, h)
 	default:

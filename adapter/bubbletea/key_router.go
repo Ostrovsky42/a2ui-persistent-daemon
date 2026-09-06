@@ -119,15 +119,19 @@ func (m *Model) handleInputKey(id, value string, msg tea.KeyMsg) bool {
 }
 
 func (m *Model) handleTableKey(id string, n document.Node, msg tea.KeyMsg) bool {
+	selectionChanged := false
 	switch msg.Type {
 	case tea.KeyUp:
 		_ = m.controller.MoveTableSelection(id, -1)
+		selectionChanged = true
 	case tea.KeyDown:
 		_ = m.controller.MoveTableSelection(id, 1)
+		selectionChanged = true
 	case tea.KeyHome:
 		snapshot := m.semanticSnapshot()
 		if selection, ok := snapshot.TableSelections[id]; ok {
 			_ = m.controller.MoveTableSelection(id, -selection.Index)
+			selectionChanged = true
 		}
 	case tea.KeyEnd:
 		var rows [][]string
@@ -139,11 +143,18 @@ func (m *Model) handleTableKey(id string, n document.Node, msg tea.KeyMsg) bool 
 				current = selection.Index
 			}
 			_ = m.controller.MoveTableSelection(id, len(rows)-1-current)
+			selectionChanged = true
 		}
 	case tea.KeyEnter:
 		_ = m.controller.ActivateTableSelection(id)
 	default:
 		return false
+	}
+	if selectionChanged {
+		// Runtime owns semantic selection. Reconciliation combines that selection,
+		// current geometry and existing adapter-local continuity state to resolve
+		// the next visible row window.
+		m.reconcileLocalState()
 	}
 	return true
 }

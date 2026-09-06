@@ -43,7 +43,7 @@ A reliable session starts with `hello`:
 {"v":1,"session":"omarchy-choice","kind":"hello","seq":0,"payload":{"versions":[1],"features":["commit-barrier"]}}
 ```
 
-The runtime negotiates the version and supported features before reliable mutations begin.
+The runtime negotiates the version, supported features, component capabilities, and finite limits before reliable mutations begin. `hello_ack.components` is the complete node-type allowlist for that session. An agent must not send a component absent from it; a newer agent degrades before sending by expressing the UI with advertised V1 components. Unknown node types received anyway remain strict schema errors. V1 does not define a generic node-level fallback or catalog negotiation subsystem.
 
 Mutations then start at sequence `1` and increase by exactly one:
 
@@ -93,6 +93,7 @@ Use `upsert` to create a node or to fully replace the props of an existing node.
 - omitted parent defaults to `root`;
 - parent must already exist;
 - only `box` and `viewport` can contain children;
+- an in-range `index` inserts at that position; an omitted or out-of-range index appends;
 - depth, node count, child count, retained bytes, and component-specific limits still apply.
 
 ### Existing-node rules
@@ -113,12 +114,24 @@ and receives an `upsert` with only:
 
 omitted fields return to their defaults. Use `props` when you intend a patch.
 
+Tree position is also part of an existing-node `upsert`:
+
+- omitted `parent` keeps the current parent;
+- an explicit different `parent` atomically relocates the surviving node and its complete subtree to that existing container;
+- omitted `index` with an unchanged parent preserves sibling order;
+- omitted `index` after a parent change appends to the target parent;
+- explicit `index` reorders within the final target parent; an out-of-range index appends, matching creation semantics.
+
+Relocation is identity-preserving. A same-type node is not remove/recreated merely because its tree position changes, so renderer-independent runtime state keyed by the surviving ID—such as an edited input value, semantic focus, or stable table selection—survives unless another semantic rule independently invalidates it. Descendant IDs survive a subtree move as well.
+
+Props/type/topology changes are validated as one candidate. If relocation would create a cycle or violate depth/children/resource invariants, the whole candidate is rejected and the current Document remains unchanged.
+
 ### Typical errors
 
-- missing parent → document validation error;
-- non-container parent → `document.parent_not_container`;
-- reparent attempt on existing node → `document.reparent_unsupported`;
-- invalid property/color/type → candidate rejected without changing the current Document.
+- missing target parent → `document.parent_not_found`;
+- non-container target parent → `document.parent_not_container`;
+- moving a node under itself or its descendant → `document.cycle`;
+- invalid property/color/type or resource/invariant violation → candidate rejected without changing the current Document.
 
 ---
 
