@@ -43,6 +43,7 @@ func main() {
 			os.Exit(runSetupCodexCommand(context.Background(), os.Args[2:], os.Stdout, os.Stderr))
 		case "-h", "--help", "help":
 			printUsage()
+			printConnectabilityUsage(os.Stdout)
 			return
 		}
 	}
