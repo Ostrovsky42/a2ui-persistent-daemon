@@ -1,14 +1,18 @@
 package bubbletea
 
-// ViewportState is Bubble Tea-local presentation state. It controls which
-// rendered lines are visible but is never written to the A2UI document/runtime.
+// ViewportState is Bubble Tea-local user-controlled scroll state. Offset is
+// changed by viewport navigation keys and PinnedToTail carries follow-tail
+// policy; neither value is written to the A2UI document/runtime.
 type ViewportState struct {
 	Offset       int
 	PinnedToTail bool
 }
 
-// TableViewportState is renderer-local table presentation state. Semantic row
-// selection remains runtime-owned; this offset only selects the visible slice.
+// TableViewportState is intentionally a different state machine from
+// ViewportState. It is not independently scrollable and has no pin/follow-tail
+// policy. Offset only caches the top rendered row chosen from runtime-owned
+// semantic selection plus current geometry, so adjacent selection changes can
+// avoid needless visual jumps. Reconciliation always clamps/overwrites it.
 type TableViewportState struct {
 	Offset int
 }
