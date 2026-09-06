@@ -29,26 +29,30 @@ func TestPlanTableLayoutUsesFullModeWhenPreferredWidthsFit(t *testing.T) {
 }
 
 func TestPlanTableLayoutCompressesNonSelectableTableDeterministically(t *testing.T) {
+	cols := []tableColumn{
+		{Title: "First", Width: 12},
+		{Title: "Second", Width: 12},
+		{Title: "Third", Width: 12},
+	}
+	rows := [][]string{{"alpha", "beta", "gamma"}}
 	plan := planTableLayout(TableLayoutInput{
-		AvailableWidth:  25,
+		AvailableWidth:  35,
 		AvailableHeight: 20,
-		Columns: []tableColumn{
-			{Title: "First", Width: 12},
-			{Title: "Second", Width: 12},
-			{Title: "Third", Width: 12},
-		},
-		RowCount: 8,
+		Columns:         cols,
+		Rows:            rows,
+		RowCount:        len(rows),
 	})
 
 	if plan.Mode != TableModeCompressed {
 		t.Fatalf("expected compressed mode, got %v", plan.Mode)
 	}
-	if got := sum(plan.ColumnWidths) + 6; got > 25 {
-		t.Fatalf("compressed table width %d exceeds available width 25", got)
+	if got := sum(plan.ColumnWidths) + 6; got > 35 {
+		t.Fatalf("compressed table width %d exceeds available width 35", got)
 	}
+	floors := minimumReadableTableWidths(cols, rows)
 	for i, width := range plan.ColumnWidths {
-		if width < 3 {
-			t.Fatalf("column %d shrank below renderer minimum: %d", i, width)
+		if width < floors[i] {
+			t.Fatalf("column %d shrank below readable floor %d: %d", i, floors[i], width)
 		}
 	}
 }
