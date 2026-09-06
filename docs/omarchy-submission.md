@@ -12,9 +12,31 @@ Expanded technical version:
 
 `Zero-sandbox` here means that the **UI description plane** does not require executing a generated UI program inside a per-screen sandbox. It does not mean the agent, daemon, host actions, or user account are universally sandboxed.
 
+## Evidence source of truth
+
+This proposal deliberately does **not** duplicate changing implementation verdicts such as “verified”, “open”, “CLI ready”, “sanitizer proven”, or “full CI green”. Those statements belong in one place:
+
+```text
+docs/security-evidence.md
+```
+
+Evidence pin used while preparing this draft:
+
+```text
+A2UI integration base (develop):
+9c40b58e7ed27264da8b02f51e4150072f3ce3eb
+
+security-evidence.md content blob at that base:
+e7501f67c0e28523e9c3e4a522b95b7e9527f605
+```
+
+The current Adaptive Data Surfaces R1 branch is renderer-only and is stacked from that integration base. Before an upstream Omarchy submission, replace the pin with the **final candidate commit**, rerun the ledger’s required verification commands on that exact commit, and attach the resulting CI URL. If this proposal and the ledger disagree about current security/release status, the ledger wins.
+
+This file therefore describes architecture, value, demo acceptance criteria, integration shape and maintainer cost. It does not maintain a second release-status database in prose.
+
 ## Why this fits Omarchy
 
-Current Omarchy treats coding agents as first-class terminal tools and leans heavily on keyboard-driven terminal/TUI workflows. A2UI adds a missing primitive between "agent prints text" and "agent executes a generated program": a bounded, stateful terminal UI description channel.
+Omarchy treats coding agents as first-class terminal tools and leans heavily on keyboard-driven terminal/TUI workflows. A2UI adds a primitive between “agent prints text” and “agent executes a generated program”: a bounded, stateful terminal UI description channel.
 
 The intended interaction is:
 
@@ -30,34 +52,27 @@ semantic event returns to agent
 agent updates the same panel
 ```
 
-The terminal window can close and reopen without killing the semantic UI session because `a2uid` owns the long-lived state.
+The terminal window can close and reopen without requiring the semantic UI lifetime to be owned by that window; the daemon is the semantic owner.
 
-## What exists today
+## Stable architecture surface
 
-Implemented in the A2UI repository:
+The proposal is built around these repository surfaces:
 
 - persistent `a2uid` daemon;
-- thin Bubble Tea `a2ui` client;
-- one interactive client lease;
-- Unix-domain-socket snapshot/interaction IPC;
-- daemon-owned Document, focus, input values, table selection and publication state;
-- reconnect with semantic state preserved;
-- exact-generation renderer publication acknowledgement;
+- Bubble Tea `a2ui` renderer client;
+- daemon-owned Document, Runtime projection, events and publication state;
+- Unix-domain-socket daemon/client control channel;
 - six public mutations: `upsert`, `props`, `text`, `remove`, `focus`, `commit`;
-- strict JSON decoding and transactional Document mutation;
-- finite retained-state/resource limits;
-- developer smoke/reattach/startup-stress harness;
-- verified terminal-control and OSC escape sanitization;
-- stable agent-facing CLI (`a2ui send`, `a2ui wait-event`, `a2ui status`, `a2ui interact`);
-- verified end-to-end round-trip demo (`scripts/demo/roundtrip.sh` / `make demo`);
-- standard Makefile installation targets (`make build`, `make install`, `make uninstall`);
-- protocol, implementation and security documentation.
+- strict protocol/session/document layers;
+- renderer-local presentation state;
+- developer/conformance/evidence tooling and documentation.
 
-## What does not exist yet
+Whether a particular security property, CLI workflow, packaging target or end-to-end demo is currently release-proven is **not restated here**. Read the pinned `docs/security-evidence.md` and the final candidate CI instead.
 
-Do not pitch these as finished:
+## Explicit non-claims
 
-- final Omarchy package/install integration;
+Do not pitch any of the following as part of A2UI merely because they are plausible Omarchy integrations:
+
 - `omarchy a2ui` command;
 - Omarchy hotkey/menu integration;
 - systemd user service/socket activation;
@@ -66,15 +81,17 @@ Do not pitch these as finished:
 - ANSI/Base16 system-theme mapping;
 - Wayland clipboard integration;
 - Vim `hjkl` navigation;
-- authenticated remote HTTP ingress;
-- disk persistence across daemon restart.
+- authenticated remote ingress unless the evidence ledger says it is implemented and verified;
+- disk persistence across daemon restart unless a later checkpoint explicitly adds it.
 
-## Demo required before submission
+## Demo acceptance criteria
 
-The maintainer-facing demo should run on a clean selected Omarchy version and show a real three-process flow:
+Before submission, run the maintainer-facing demo on a clean selected Omarchy version using the **actual installed command surface documented by the final candidate**. Do not preserve proposed command names here.
+
+The demo must show a real three-process flow:
 
 ```text
-agent script / CLI
+agent-facing command/script
        │
        ▼
      a2uid
@@ -83,21 +100,22 @@ agent script / CLI
      a2ui
 ```
 
-Required scenario:
+Required behavior:
 
-1. start `a2uid`;
-2. agent publishes a two-row choice table plus optional comment input;
-3. user selects a row;
-4. agent receives the semantic `select` event;
-5. agent updates status/log/progress in the same UI;
-6. user submits a comment;
-7. close the terminal client while daemon remains alive;
-8. reopen `a2ui` and show preserved semantic state;
-9. finish with a `commit` and corresponding renderer publication event.
+1. start the daemon using the shipped installation path;
+2. publish a two-row choice table plus optional comment input without hand-writing protocol JSON;
+3. let the user select a row;
+4. return the semantic `select` event to the agent-facing side;
+5. update status/log/progress in the same semantic UI;
+6. submit a comment and return its semantic event;
+7. close the terminal client while the daemon remains alive;
+8. reopen the renderer and demonstrate the documented semantic-state continuity;
+9. finish with a `commit` and the implementation’s corresponding publication acknowledgement/event;
+10. repeat from a directory outside the source checkout.
 
-The demo must not require the reviewer to hand-write JSON or copy a generated temporary socket path between shells.
+The demo must not require the reviewer to copy generated temporary socket paths between shells or know repository-internal worktree layout.
 
-Until the user-facing agent CLI exists, this demo gate is **open**.
+The **current pass/fail state of this demo is recorded only in the evidence ledger/final release evidence**, not in this proposal.
 
 ## Protocol summary
 
@@ -120,46 +138,45 @@ The executable reference fixture is:
 assets/examples/omarchy-choice.ndjson
 ```
 
+Normative semantics remain in `references/PROTOCOL.md`; the practical walkthrough is `docs/protocol-guide.md`.
+
 ## Security positioning
 
 The maintainer proposal should make only the bounded comparison:
 
 > For displaying a dynamic agent-generated interface, A2UI exposes a smaller capability surface than executing arbitrary model-generated Bash with the same user privileges and no additional confinement.
 
-Evidence supporting that comparison:
+Do not copy the current security-status matrix into this document. The authoritative review package is:
 
-- six fixed UI mutations contain no shell/process/filesystem/network primitive;
-- strict JSON rejects duplicate keys and unknown fields;
-- invalid candidate mutations leave authoritative Document state unchanged;
-- retained state has finite limits;
-- local daemon/client IPC is UID-local by Unix permissions under normal assumptions;
-- unknown host action IDs are denied;
-- stale renderer ACKs cannot publish newer generations.
+```text
+docs/security-model.md      threat model and bounded claim
+docs/security-evidence.md   claim -> implementation -> regression -> status
+```
 
-Important limitations to state explicitly:
+This prevents proposal prose from silently retaining a stale verdict after implementation, tests, ingress policy or dependencies change.
 
-- registered host actions are privileged capabilities;
-- same-UID/root processes are outside UDS permission isolation;
-- HTTP ingress currently has no caller-authentication layer and should remain loopback/dev-only;
-- terminal escape/control sanitization is not yet proven;
-- renderer ACK is not proof of human attention;
-- ordinary A2UI inputs are not a secrets vault;
-- retained-state limits are not a complete CPU/connection DoS proof.
+The proposal must also preserve the distinction between:
 
-See `docs/security-model.md` and `docs/security-evidence.md`.
+```text
+renderer publication acknowledgement != proof of human attention
+registered host action              != harmless UI description
+local Unix permissions              != universal process isolation
+finite retained-state limits        != complete DoS proof
+```
+
+For the current status of terminal-control handling, HTTP/MCP access policy, action cancellation, UDS assumptions and release gates, cite the pinned ledger rather than paraphrasing it here.
 
 ## Dependencies and operational cost
 
-Current runtime:
+Current architecture uses:
 
-- Go daemon and client;
+- Go daemon and clients/tools;
 - Bubble Tea + Lip Gloss in the terminal adapter;
 - Unix domain socket for local renderer control;
-- optional MCP/HTTP bridge for development/integration;
-- no database required;
-- no disk persistence required for the current ephemeral-session model.
+- transport adapters around the A2UI semantic protocol;
+- no database required for the current in-memory session model.
 
-Before upstream proposal, measure and publish:
+Before upstream proposal, measure and publish on the final candidate:
 
 ```text
 idle daemon RSS
@@ -190,13 +207,13 @@ Later integrations such as theme, bar status, notifications and clipboard should
 
 ## Manual placement
 
-The current Omarchy Quattro source exposes the Manual under `manual/` and its AI chapter describes coding agents as first-class citizens. The exact upstream filename/location for an A2UI page should be chosen from the active upstream tree at submission time, not hard-coded here.
+The exact upstream filename/location for an A2UI page must be chosen from the active Omarchy tree at submission time, not hard-coded into this repository.
 
 Potential editorial homes:
 
 - AI, if A2UI is treated as an agent interaction primitive;
 - TUIs, if it is shipped primarily as a terminal application;
-- a dedicated page only after install/launch integration exists.
+- a dedicated page only after install/launch integration is accepted.
 
 This repository stages its standalone chapter at:
 
@@ -206,33 +223,34 @@ docs/manual/a2ui.md
 
 ## Submission sequence
 
-Recommended order:
+Recommended order, expressed as gates rather than cached status claims:
 
-1. close the no-JSON agent CLI prerequisite;
-2. run the full end-user demo on a clean Omarchy install;
-3. close or explicitly scope terminal-control and HTTP access gaps;
-4. record fresh full test/race/vet/fuzz results on exact SHA;
-5. publish resource measurements;
-6. prepare a short demo recording/screenshots;
-7. open an upstream proposal/issue/discussion for the architecture-sized addition before assuming a Manual PR will be accepted;
-8. only then adapt the staged Manual text and packaging/integration to the path requested by maintainers.
+1. select the exact A2UI candidate commit and Omarchy release/branch;
+2. rerun every required gate from `docs/security-evidence.md` on that exact commit;
+3. run the no-handwritten-JSON end-user round trip from a clean install outside the checkout;
+4. run reconnect/publication behavior exactly as documented by that candidate;
+5. record unresolved security limitations from the ledger without softening them in proposal prose;
+6. publish resource measurements;
+7. record a short demo and capture reproduction commands;
+8. open the architecture-sized upstream proposal/issue/discussion before assuming a Manual PR will be accepted;
+9. adapt the staged Manual text and packaging/integration only to the path maintainers request.
 
 ## Evidence package to attach
 
-- repository + exact SHA;
+- repository + exact final commit;
+- `docs/security-evidence.md` from that same commit;
+- CI URL for the ledger gates;
 - demo video/GIF and reproduction commands;
 - `docs/manual/a2ui.md`;
 - `docs/protocol-guide.md`;
 - `docs/security-model.md`;
-- `docs/security-evidence.md`;
 - executable `assets/examples/omarchy-choice.ndjson` fixture;
-- CI URL showing `test`, `race`, `vet` and fuzz gates;
 - measured resource table;
-- known limitations and maintenance owner.
+- explicit known limitations and maintenance owner.
 
 ## Maintainer-facing summary
 
-Suggested short proposal text after all gates are closed:
+Suggested short proposal text **only after the final evidence gate is refreshed**:
 
 > A2UI is a small persistent terminal UI runtime for coding agents. Instead of asking an agent to generate and execute a UI program, the agent sends six validated state mutations to a local daemon. A Bubble Tea client can disappear and reconnect while the daemon keeps the semantic UI and returns user selections/input as events. The proposal is intentionally narrower than a general agent sandbox: host actions remain explicit capabilities, and the attached security evidence lists the current trust boundaries and open gaps. The demo and protocol fixture are reproducible without LLM credentials.
 
