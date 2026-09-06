@@ -64,4 +64,12 @@ func TestRendererHonorsLocalTableViewportOffset(t *testing.T) {
 			t.Fatalf("unexpected %q outside preserved local window:\n%s", hidden, result.Frame)
 		}
 	}
+
+	metrics, ok := result.Tables["agents"]
+	if !ok {
+		t.Fatalf("expected table viewport metrics, got %#v", result.Tables)
+	}
+	if metrics.TotalRows != 20 || metrics.VisibleRows != 4 || metrics.MaxOffset != 16 || metrics.Offset != 10 {
+		t.Fatalf("unexpected table metrics: %#v", metrics)
+	}
 }
