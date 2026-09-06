@@ -26,19 +26,12 @@ Evidence pin used while preparing this draft:
 A2UI integration base (develop):
 9c40b58e7ed27264da8b02f51e4150072f3ce3eb
 
-security-evidence.md content blob at that base:
-e7501f67c0e28523e9c3e4a522b95b7e9527f605
-```
-
-Machine-readable pin enforced by `conformance/omarchy_evidence_pin_test.go`:
-
-```text
 security-evidence-blob: e7501f67c0e28523e9c3e4a522b95b7e9527f605
 ```
 
-Any change to `docs/security-evidence.md` must update this pin in the same change. CI recomputes the Git blob object ID from the current ledger bytes and rejects a stale proposal pin.
+The `security-evidence-blob` line is the single content pin. `conformance/omarchy_evidence_pin_test.go` recomputes the Git blob object ID from the current `docs/security-evidence.md` bytes and requires an exact match. Any ledger change must therefore update this pin in the same change or CI fails.
 
-The current Adaptive Data Surfaces R1 branch is renderer-only and is stacked from that integration base. Before an upstream Omarchy submission, replace the pin with the **final candidate commit**, rerun the ledger’s required verification commands on that exact commit, and attach the resulting CI URL. If this proposal and the ledger disagree about current security/release status, the ledger wins.
+The current Adaptive Data Surfaces R1 branch is renderer-only and is stacked from that integration base. Before an upstream Omarchy submission, replace the integration base with the **final candidate commit**, rerun the ledger’s required verification commands on that exact commit, and attach the resulting CI URL. If this proposal and the ledger disagree about current security/release status, the ledger wins.
 
 This file therefore describes architecture, value, demo acceptance criteria, integration shape and maintainer cost. It does not maintain a second release-status database in prose.
 
