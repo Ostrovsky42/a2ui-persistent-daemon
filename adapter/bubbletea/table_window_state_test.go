@@ -76,8 +76,8 @@ func TestTableWindowTracksStableRuntimeSelectionAcrossAgentReorder(t *testing.T)
 	rows, rowIDs := tableWindowFixture(20)
 	props, _ := json.Marshal(map[string]any{
 		"selectable": true,
-		"columns": []map[string]any{{"title": "Agent", "width": 14}, {"title": "State", "width": 12}},
-		"rows": rows, "row_ids": rowIDs,
+		"columns":    []map[string]any{{"title": "Agent", "width": 14}, {"title": "State", "width": 12}},
+		"rows":       rows, "row_ids": rowIDs,
 	})
 	if perr := eng.Apply(protocol.Operation{V: 1, Seq: 1, Op: protocol.OpUpsert, ID: "agents", Type: protocol.NodeTable, Parent: "root", Props: props}); perr != nil {
 		t.Fatal(perr)
