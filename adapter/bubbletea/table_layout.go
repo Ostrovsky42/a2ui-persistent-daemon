@@ -14,11 +14,11 @@ const (
 )
 
 const (
-	tableMinColumnWidth            = 3
-	tableSelectablePrefixW         = 2
-	tableNormalSeparatorW          = 3
-	tableCompactSeparatorW         = 1
-	tablePaneSeparatorWidth        = 3
+	tableMinColumnWidth               = 3
+	tableSelectablePrefixW            = 2
+	tableNormalSeparatorW             = 3
+	tableCompactSeparatorW            = 1
+	tablePaneSeparatorWidth           = 3
 	tableReadablePreferredNumerator   = 3
 	tableReadablePreferredDenominator = 4
 )
