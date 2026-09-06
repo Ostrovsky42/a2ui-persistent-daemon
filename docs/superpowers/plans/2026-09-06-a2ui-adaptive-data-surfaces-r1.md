@@ -115,4 +115,4 @@
 - [ ] **Step 1: Ensure branch diff contains no changes under `protocol/` or `assets/schema.json`.**
 - [ ] **Step 2: Require `gofmt`, `go test ./...`, `go vet ./...`, `go test -race ./...`, wire fuzz smoke, document fuzz smoke, IPC fuzz smoke and conformance suite to pass.**
 - [ ] **Step 3: Review PR diff for hidden semantic changes, especially selection ownership, publication barriers and event emission.**
-- [ ] **Step 4: Record exact branch head and CI run in the PR before marking ready.**
+- [ ] **Step 4: Treat GitHub required checks attached to the current PR HEAD as authoritative. Do not maintain a mutable branch SHA or workflow-run pin in PR prose; any new commit must naturally require fresh current-head checks before Ready/Merge.**
