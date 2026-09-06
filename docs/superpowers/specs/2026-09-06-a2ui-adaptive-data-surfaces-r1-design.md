@@ -110,9 +110,9 @@ Used when a useful tabular/master-detail presentation cannot fit. Every row is r
 
 Table geometry policy lives in `adapter/bubbletea/table_layout.go`.
 
-The planner receives available width/height, columns and rows, row count, selectability, semantic selection, current row-window continuity state and table style inputs. It returns a deterministic `TableLayoutPlan` containing mode, preferred/resolved/readable widths, visible master columns, pane widths and visible row range.
+The planner receives only `TableLayoutInput`: available width/height, the sanitized column contract, row count, selectability, the runtime-owned selected row index, adapter-local row-window continuity offset, and table variant. Row values never cross the planner boundary. They remain rendering data consumed only after the single layout plan has been selected.
 
-Rows are still required for rendering/windowing, but cell contents are not inputs to the mode/readable-floor decision.
+The planner returns a deterministic `TableLayoutPlan` containing mode, preferred/resolved/readable widths, visible master columns, pane widths and visible row range. Selection and row-window continuity affect only row range; current cell contents cannot affect mode or readable floors.
 
 The planner is a permanent layer boundary. The same five-column agent-activity table contract has paired discriminator tests:
 
@@ -137,6 +137,8 @@ complete table structure + runtime selection + local continuity state
 
 A projected/windowed row slice must not be passed back through a second planner call. Otherwise row windowing can silently change the selected presentation mode or use inconsistent geometry.
 
+The structural planner-input contract is necessary but not sufficient as an integration proof. Renderer-level regression coverage must also render the same schema and geometry with materially different row cell lengths and prove that presentation does not move from the planner-selected mode elsewhere in the rendering path.
+
 ## Vertical windowing
 
 Large tables render only rows visible in the current terminal height. The selected row must always remain visible.
@@ -153,6 +155,8 @@ Despite the historical name, this is **not** a second user-controlled scroll sta
 
 Because the prior offset intentionally affects the next window when selection remains inside it, the offset is not a history-free pure function of only selection and geometry. It must therefore be treated as real local state with one reconciliation law, not described as disposable derived data.
 
+Continuity is scoped to one Bubble Tea adapter attachment. A fresh adapter model starts with a fresh `InteractionState`, so both `Viewports` and `TableViewports` are empty and their offsets restart from the renderer-resolved initial position. Detach followed by a new attachment must not persist table-window or viewport continuity across that boundary. A transport reconnect that deliberately keeps the same adapter model alive is still the same attachment and therefore retains its existing local state.
+
 Window reconciliation law:
 
 ```text
@@ -164,6 +168,7 @@ stable row-id reorder            -> runtime follows row ID; local window reconci
 row shrink                       -> clamp/reconcile so selection remains visible
 removed/non-selectable table     -> prune local window state
 focus change                     -> must not invalidate/reposition a still-valid table window
+fresh adapter attachment         -> start with no persisted local window state
 ```
 
 Invariant after every reconciliation-triggering mutation:
@@ -203,6 +208,8 @@ R1 does not add sorting, filtering, search, horizontal scrolling, independent ta
 
 A single immutable selectable table must demonstrate full, compressed, master/detail and record presentation across terminal widths, restore its original presentation on resize back, preserve selected `row_id`, preserve deterministic runtime focus order, and emit no semantic/publication side effects from presentation-only changes.
 
-For fixed columns and terminal geometry, changing only row cell lengths must not change the selected presentation mode.
+For fixed columns and terminal geometry, changing only row cell lengths must not change the selected presentation mode at either the planner boundary or the renderer integration boundary.
 
 Large row sets up to the V1 limit must render a bounded visible row window rather than constructing the full visual table each frame. That window must follow runtime-owned semantic selection and keep its renderer-local continuity state reconciled to a fixed point after every relevant mutation class rather than becoming a second scroll authority.
+
+A fresh adapter attachment must begin with fresh viewport and table-window local state; presentation continuity is never persisted across adapter attachment lifetimes.
