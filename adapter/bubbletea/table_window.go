@@ -9,10 +9,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderTableWindowed computes one plan from the complete sanitized dataset,
-// then applies renderer-local row windowing to that plan. It never re-plans a
-// projected row slice, so presentation mode and readable-width decisions are
-// stable across vertical windowing.
+// renderTableWindowed computes one structural plan from the complete column
+// contract plus row count, then applies renderer-local row windowing to that
+// plan. It never re-plans a projected row slice, so presentation mode and
+// readable-width decisions are stable across vertical windowing and row values.
 func (r *Renderer) renderTableWindowed(n document.Node, focused bool, selection a2runtime.TableSelection, maxW, maxH, rowOffset int) string {
 	cols, rows := decodeSanitizedTable(n)
 	if len(cols) == 0 {
@@ -32,7 +32,6 @@ func (r *Renderer) renderTableWindowed(n document.Node, focused bool, selection 
 		AvailableWidth:  maxW,
 		AvailableHeight: maxH,
 		Columns:         cols,
-		Rows:            rows,
 		RowCount:        len(rows),
 		Selectable:      selectable,
 		SelectedRow:     selectedRow,
