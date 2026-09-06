@@ -178,13 +178,13 @@ func TestRendererSanitizesInjectedDocumentNodes(t *testing.T) {
 
 	// Verify dangerous escape sequences are nowhere in the output frame
 	for _, dangerous := range []string{
-		"]52;",             // OSC 52 clipboard
-		"]8;;",             // OSC 8 hyperlink
-		"]0;",              // OSC 0 window title
-		"[2J",              // CSI clear screen
-		"\xc2\x9b",         // 8-bit CSI
-		"\xc2\x9d",         // 8-bit OSC
-		"\x07",             // BEL
+		"]52;",     // OSC 52 clipboard
+		"]8;;",     // OSC 8 hyperlink
+		"]0;",      // OSC 0 window title
+		"[2J",      // CSI clear screen
+		"\xc2\x9b", // 8-bit CSI
+		"\xc2\x9d", // 8-bit OSC
+		"\x07",     // BEL
 	} {
 		if strings.Contains(frame, dangerous) {
 			t.Errorf("rendered frame contains dangerous sequence %q: %q", dangerous, frame)
