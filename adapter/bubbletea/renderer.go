@@ -108,7 +108,7 @@ func (r *Renderer) renderNode(ctx renderContext, id string, w, h int) string {
 		if !ok {
 			selection = a2runtime.TableSelection{Index: 0}
 		}
-		return r.renderTable(n, ctx.focusedID == id, selection, w)
+		return r.renderTableWindowed(n, ctx.focusedID == id, selection, w, h, 0)
 	case protocol.NodeViewport:
 		return r.renderViewport(ctx, n, w, h)
 	default:
