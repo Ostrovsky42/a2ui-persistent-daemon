@@ -72,9 +72,9 @@ const (
 )
 ```
 
-Mode selection is a pure function of geometry, variant/preset, preferred column widths, current sanitized dataset, column count, row count and selectability.
+Mode selection is a pure function of geometry, variant/preset, the stable column contract, column count, row count and selectability. Current row cell values do not participate in the mode decision.
 
-There is no terminal breakpoint such as `width < 80`. Mode switches are consequences of whether the current table can satisfy its intrinsic presentation constraints inside available geometry.
+There is no terminal breakpoint such as `width < 80`. Mode switches are consequences of whether the declared table structure can satisfy its intrinsic presentation constraints inside available geometry.
 
 ### Full
 
@@ -84,17 +84,19 @@ Preferred widths fit in available width.
 
 Preferred widths do not fit, but every column can remain at or above its computed readable floor.
 
-For R1, each readable floor is derived deterministically from existing V1 information:
+For R1, each readable floor is derived deterministically from stable existing V1 information:
 
 - hard renderer minimum;
 - a conservative fraction of `columns[].width` (the existing preferred width hint);
-- observed sanitized title/cell width, capped by the preferred width.
+- sanitized column title width, capped by the preferred width.
 
-This is a renderer policy, not a new protocol semantic. No column may be compressed below its computed floor merely because a particular terminal width was crossed.
+Current row values are deliberately excluded from the readable floor. They may be truncated in tabular modes and remain fully available in master/detail or record presentation, but streaming a longer/shorter cell at fixed schema and terminal geometry must not make presentation mode oscillate.
+
+This is a renderer policy, not a new protocol semantic. No column may be compressed below its computed structural floor merely because a particular terminal width was crossed.
 
 ### Master/detail
 
-Eligible only when the table is selectable, non-empty, has at least four columns and there is enough width for two useful panes derived from the current readable floors.
+Eligible only when the table is selectable, non-empty, has at least four columns and there is enough width for two useful panes derived from the structural readable floors.
 
 The master pane shows the longest source-order prefix that fits without violating readable floors. The detail pane shows every field of the selected row, so no semantic field is silently discarded.
 
@@ -108,30 +110,32 @@ Used when a useful tabular/master-detail presentation cannot fit. Every row is r
 
 Table geometry policy lives in `adapter/bubbletea/table_layout.go`.
 
-The planner receives available width/height, full sanitized columns and rows, row count, selectability, semantic selection, current row-window cache and table style inputs. It returns a deterministic `TableLayoutPlan` containing mode, preferred/resolved/readable widths, visible master columns, pane widths and visible row range.
+The planner receives available width/height, columns and rows, row count, selectability, semantic selection, current row-window continuity state and table style inputs. It returns a deterministic `TableLayoutPlan` containing mode, preferred/resolved/readable widths, visible master columns, pane widths and visible row range.
 
-The planner is a permanent layer boundary. The same five-column agent-activity dataset has paired discriminator tests:
+Rows are still required for rendering/windowing, but cell contents are not inputs to the mode/readable-floor decision.
+
+The planner is a permanent layer boundary. The same five-column agent-activity table contract has paired discriminator tests:
 
 ```text
 width 80  -> MasterDetail
 width 120 -> Full
 ```
 
-These tests distinguish cost-model failures from renderer/integration failures without print-debugging.
+The discriminator uses stable preferred widths to force these modes; it does not depend on a particular current cell value. These tests distinguish cost-model failures from renderer/integration failures without print-debugging.
 
 ### Single-plan integration law
 
-The renderer must compute the table plan exactly once from the complete sanitized dataset before vertical row slicing:
+The renderer must compute the table plan exactly once before vertical row slicing:
 
 ```text
-full dataset
+complete table structure + runtime selection + local continuity state
   -> PlanTableLayout
   -> mode + column/pane geometry + row range
   -> slice visible rows
   -> draw according to that plan
 ```
 
-A projected/windowed row slice must not be passed back through a second planner call. Otherwise row windowing can silently change the selected presentation mode and bypass dataset-derived readability decisions.
+A projected/windowed row slice must not be passed back through a second planner call. Otherwise row windowing can silently change the selected presentation mode or use inconsistent geometry.
 
 ## Vertical windowing
 
@@ -145,18 +149,30 @@ type TableViewportState struct {
 }
 ```
 
-Despite the historical name, this is **not** a second user-controlled scroll state. Semantic selection remains runtime-owned. `Offset` is only a derived/cache value for the top visible row so adjacent semantic selection moves can avoid needless jumps.
+Despite the historical name, this is **not** a second user-controlled scroll state. Semantic selection remains runtime-owned. `Offset` is renderer-local **presentation continuity state**: the previous top visible row is retained so adjacent semantic selection moves do not recenter/jump unnecessarily.
 
-Derived-window law:
+Because the prior offset intentionally affects the next window when selection remains inside it, the offset is not a history-free pure function of only selection and geometry. It must therefore be treated as real local state with one reconciliation law, not described as disposable derived data.
+
+Window reconciliation law:
 
 ```text
-semantic selection inside window -> cached top row unchanged
+semantic selection inside window -> top row unchanged
 selection below window           -> advance minimum necessary amount
 selection above window           -> rewind minimum necessary amount
-resize / data change             -> clamp/recompute from selection + geometry
-stable row-id reorder            -> runtime follows row ID; cache follows resulting index
-removed/non-selectable table     -> prune cache
+resize / data change             -> clamp/reconcile against selection + geometry
+stable row-id reorder            -> runtime follows row ID; local window reconciles to resulting index
+row shrink                       -> clamp/reconcile so selection remains visible
+removed/non-selectable table     -> prune local window state
+focus change                     -> must not invalidate/reposition a still-valid table window
 ```
+
+Invariant after every reconciliation-triggering mutation:
+
+```text
+cached local offset == renderer-resolved offset when rendering once from that cached state
+```
+
+In other words, the cache must be a fixed point of the current Document + runtime selection + geometry. Regression coverage must exercise selection navigation, stable row-ID reorder, row shrink, table removal/non-selectability, resize and focus change. This catches any future mutation path that forgets to reconcile the local continuity state.
 
 There are no independent table `PageUp/PageDown` scroll commands and no table `PinnedToTail` state.
 
@@ -164,7 +180,7 @@ This intentionally differs from a scrollable `viewport`:
 
 ```text
 viewport: user directly owns presentation scroll offset + follow-tail pin
- table:   user owns semantic row selection; top-row offset is derived from it
+ table:   user owns semantic row selection; adapter retains constrained top-row continuity state
 ```
 
 Because the state machines and authorities differ, R1 does not force them into one generic scroll primitive. Shared low-level clamp helpers are acceptable, but ownership semantics remain distinct.
@@ -177,7 +193,7 @@ Focus regression coverage must force Full, MasterDetail and Records modes for th
 
 ## Presets
 
-`minimal`, `dashboard` and `dense` may change borders, spacing and decoration. They must not change semantic selection, row identity, actions, focus order or data presence. Mode selection stays geometry/data-driven rather than preset-breakpoint-driven.
+`minimal`, `dashboard` and `dense` may change borders, spacing and decoration. They must not change semantic selection, row identity, actions, focus order or data presence. Mode selection stays geometry/structure-driven rather than preset-breakpoint- or row-value-driven.
 
 ## Non-goals
 
@@ -187,4 +203,6 @@ R1 does not add sorting, filtering, search, horizontal scrolling, independent ta
 
 A single immutable selectable table must demonstrate full, compressed, master/detail and record presentation across terminal widths, restore its original presentation on resize back, preserve selected `row_id`, preserve deterministic runtime focus order, and emit no semantic/publication side effects from presentation-only changes.
 
-Large row sets up to the V1 limit must render a bounded visible row window rather than constructing the full visual table each frame. That window must follow runtime-owned semantic selection and remain a renderer-local derived cache rather than becoming a second scroll authority.
+For fixed columns and terminal geometry, changing only row cell lengths must not change the selected presentation mode.
+
+Large row sets up to the V1 limit must render a bounded visible row window rather than constructing the full visual table each frame. That window must follow runtime-owned semantic selection and keep its renderer-local continuity state reconciled to a fixed point after every relevant mutation class rather than becoming a second scroll authority.
