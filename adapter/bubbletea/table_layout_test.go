@@ -103,3 +103,78 @@ func TestPlanTableLayoutFallsBackToRecordsWhenNarrow(t *testing.T) {
 		t.Fatalf("expected records mode, got %v", plan.Mode)
 	}
 }
+
+func TestPlanTableLayoutBoundsVisibleRowsByHeight(t *testing.T) {
+	plan := planTableLayout(TableLayoutInput{
+		AvailableWidth:  80,
+		AvailableHeight: 6,
+		Columns: []tableColumn{
+			{Title: "Agent", Width: 14},
+			{Title: "State", Width: 12},
+		},
+		RowCount:    100,
+		Selectable:  true,
+		SelectedRow: 0,
+		RowOffset:   0,
+	})
+
+	if plan.RowStart != 0 || plan.RowEnd != 4 {
+		t.Fatalf("expected visible rows [0,4), got [%d,%d)", plan.RowStart, plan.RowEnd)
+	}
+}
+
+func TestPlanTableLayoutMovesWindowOnlyWhenSelectionLeavesIt(t *testing.T) {
+	inside := planTableLayout(TableLayoutInput{
+		AvailableWidth:  80,
+		AvailableHeight: 6,
+		Columns:         []tableColumn{{Title: "Agent", Width: 14}},
+		RowCount:        100,
+		Selectable:      true,
+		SelectedRow:     13,
+		RowOffset:       10,
+	})
+	if inside.RowStart != 10 || inside.RowEnd != 14 {
+		t.Fatalf("selection inside window must preserve offset: got [%d,%d)", inside.RowStart, inside.RowEnd)
+	}
+
+	below := planTableLayout(TableLayoutInput{
+		AvailableWidth:  80,
+		AvailableHeight: 6,
+		Columns:         []tableColumn{{Title: "Agent", Width: 14}},
+		RowCount:        100,
+		Selectable:      true,
+		SelectedRow:     14,
+		RowOffset:       10,
+	})
+	if below.RowStart != 11 || below.RowEnd != 15 {
+		t.Fatalf("expected minimal downward scroll to [11,15), got [%d,%d)", below.RowStart, below.RowEnd)
+	}
+
+	above := planTableLayout(TableLayoutInput{
+		AvailableWidth:  80,
+		AvailableHeight: 6,
+		Columns:         []tableColumn{{Title: "Agent", Width: 14}},
+		RowCount:        100,
+		Selectable:      true,
+		SelectedRow:     9,
+		RowOffset:       10,
+	})
+	if above.RowStart != 9 || above.RowEnd != 13 {
+		t.Fatalf("expected minimal upward scroll to [9,13), got [%d,%d)", above.RowStart, above.RowEnd)
+	}
+}
+
+func TestPlanTableLayoutClampsWindowAtLastRow(t *testing.T) {
+	plan := planTableLayout(TableLayoutInput{
+		AvailableWidth:  80,
+		AvailableHeight: 6,
+		Columns:         []tableColumn{{Title: "Agent", Width: 14}},
+		RowCount:        100,
+		Selectable:      true,
+		SelectedRow:     99,
+		RowOffset:       98,
+	})
+	if plan.RowStart != 96 || plan.RowEnd != 100 {
+		t.Fatalf("expected final window [96,100), got [%d,%d)", plan.RowStart, plan.RowEnd)
+	}
+}
