@@ -5,116 +5,117 @@ import (
 
 	"a2ui/document"
 	"a2ui/protocol"
+	a2runtime "a2ui/runtime"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// handleKey implements deterministic routing:
+// process control -> focus traversal -> focused component -> global actions.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.Type == tea.KeyCtrlC || msg.Type == tea.KeyEsc {
+	switch msg.Type {
+	case tea.KeyCtrlC:
 		m.Quitting = true
+		m.stopAnimation()
 		return m, tea.Quit
+	case tea.KeyTab:
+		m.focusNext()
+		m.reconcileLocalState()
+		return m, m.animationCommandIfNeeded()
+	case tea.KeyShiftTab:
+		m.focusPrev()
+		m.reconcileLocalState()
+		return m, m.animationCommandIfNeeded()
 	}
 
 	snapshot := m.semanticSnapshot()
-	focusedID := snapshot.FocusedID
-	n, ok := snapshot.Document.Nodes[focusedID]
-	if !ok {
-		return m, nil
+	if snapshot.FocusedID != "" {
+		if n, ok := snapshot.Document.Nodes[snapshot.FocusedID]; ok {
+			consumed := false
+			switch n.Type {
+			case protocol.NodeInput:
+				consumed = m.handleInputKey(snapshot.FocusedID, snapshot.InputValues[snapshot.FocusedID], msg)
+			case protocol.NodeTable:
+				if propBool(n, "selectable", false) {
+					consumed = m.handleTableKey(snapshot.FocusedID, n, msg)
+				}
+			case protocol.NodeViewport:
+				if propBool(n, "scrollable", false) {
+					consumed = m.handleViewportKey(snapshot.FocusedID, n, msg)
+				}
+			}
+			if consumed {
+				return m, m.animationCommandIfNeeded()
+			}
+		}
 	}
 
-	handled := false
-	switch n.Type {
-	case protocol.NodeInput:
-		handled = m.handleInputKey(focusedID, snapshot.InputValues[focusedID], msg)
-	case protocol.NodeTable:
-		handled = m.handleTableKey(focusedID, n, msg)
-	case protocol.NodeViewport:
-		handled = m.handleViewportKey(focusedID, n, msg)
-	}
-	if handled {
-		m.animationCommandIfNeeded()
-		return m, nil
-	}
-
-	if msg.Type == tea.KeyTab {
-		_ = m.controller.FocusNext(1)
-		m.reconcileLocalState()
-		return m, m.animationCommandIfNeeded()
-	}
-	if msg.Type == tea.KeyShiftTab {
-		_ = m.controller.FocusNext(-1)
-		m.reconcileLocalState()
-		return m, m.animationCommandIfNeeded()
+	key := msg.String()
+	if key != "" {
+		if _, ok := snapshot.Bindings[key]; ok && m.controller != nil {
+			_ = m.controller.ActionKey(key)
+			return m, nil
+		}
 	}
 	return m, nil
 }
 
 func (m *Model) handleInputKey(id, value string, msg tea.KeyMsg) bool {
+	m.interaction = m.interaction.clone()
 	runes := []rune(value)
-	caret := len(runes)
-	if local, ok := m.interaction.InputCarets[id]; ok {
-		caret = local
-	}
-	if caret < 0 {
-		caret = 0
-	}
-	if caret > len(runes) {
+	caret, ok := m.interaction.InputCarets[id]
+	if !ok {
 		caret = len(runes)
 	}
+	caret = clampInt(caret, 0, len(runes))
 
 	switch msg.Type {
 	case tea.KeyLeft:
 		if caret > 0 {
 			caret--
 		}
-		m.interaction.InputCarets[id] = caret
-		return true
 	case tea.KeyRight:
 		if caret < len(runes) {
 			caret++
 		}
-		m.interaction.InputCarets[id] = caret
-		return true
 	case tea.KeyHome:
-		m.interaction.InputCarets[id] = 0
-		return true
+		caret = 0
 	case tea.KeyEnd:
-		m.interaction.InputCarets[id] = len(runes)
-		return true
+		caret = len(runes)
 	case tea.KeyBackspace:
-		if caret == 0 {
-			return true
+		if caret > 0 {
+			runes = append(runes[:caret-1], runes[caret:]...)
+			caret--
+			_ = m.controller.SetInput(id, string(runes))
 		}
-		next := append(append([]rune(nil), runes[:caret-1]...), runes[caret:]...)
-		if err := m.controller.SetInputValue(id, string(next)); err == nil {
-			m.interaction.InputCarets[id] = caret - 1
-		}
-		return true
 	case tea.KeyDelete:
-		if caret >= len(runes) {
-			return true
+		if caret < len(runes) {
+			runes = append(runes[:caret], runes[caret+1:]...)
+			_ = m.controller.SetInput(id, string(runes))
 		}
-		next := append(append([]rune(nil), runes[:caret]...), runes[caret+1:]...)
-		if err := m.controller.SetInputValue(id, string(next)); err == nil {
-			m.interaction.InputCarets[id] = caret
-		}
-		return true
-	case tea.KeyEnter:
-		_ = m.controller.SubmitInput(id)
-		return true
 	case tea.KeyRunes:
-		if len(msg.Runes) == 0 {
-			return true
+		if len(msg.Runes) > 0 {
+			insert := append([]rune(nil), msg.Runes...)
+			next := make([]rune, 0, len(runes)+len(insert))
+			next = append(next, runes[:caret]...)
+			next = append(next, insert...)
+			next = append(next, runes[caret:]...)
+			caret += len(insert)
+			_ = m.controller.SetInput(id, string(next))
 		}
-		next := make([]rune, 0, len(runes)+len(msg.Runes))
+	case tea.KeySpace:
+		next := make([]rune, 0, len(runes)+1)
 		next = append(next, runes[:caret]...)
-		next = append(next, msg.Runes...)
+		next = append(next, ' ')
 		next = append(next, runes[caret:]...)
-		if err := m.controller.SetInputValue(id, string(next)); err == nil {
-			m.interaction.InputCarets[id] = caret + len(msg.Runes)
-		}
-		return true
+		caret++
+		_ = m.controller.SetInput(id, string(next))
+	case tea.KeyEnter:
+		_ = m.controller.Submit(id)
+	default:
+		return false
 	}
-	return false
+	m.interaction.InputCarets[id] = caret
+	return true
 }
 
 func (m *Model) handleTableKey(id string, n document.Node, msg tea.KeyMsg) bool {
@@ -159,44 +160,102 @@ func (m *Model) handleTableKey(id string, n document.Node, msg tea.KeyMsg) bool 
 }
 
 func (m *Model) handleViewportKey(id string, n document.Node, msg tea.KeyMsg) bool {
-	if !propBool(n, "scrollable", false) {
+	var delta int
+	absolute := false
+	target := 0
+
+	metrics, ok := m.renderResult().Viewports[id]
+	if !ok {
 		return false
 	}
-	viewport := m.interaction.Viewports[id]
-	metrics := m.renderResult().Viewports[id]
-	page := metrics.VisibleLines
+	page := metrics.VisibleLines - 1
 	if page < 1 {
-		page = maxInt(m.Height-1, 1)
+		page = 1
 	}
-
 	switch msg.Type {
 	case tea.KeyUp:
-		viewport.Offset--
-		viewport.PinnedToTail = false
+		delta = -1
 	case tea.KeyDown:
-		viewport.Offset++
-		viewport.PinnedToTail = false
+		delta = 1
 	case tea.KeyPgUp:
-		viewport.Offset -= page
-		viewport.PinnedToTail = false
+		delta = -page
 	case tea.KeyPgDown:
-		viewport.Offset += page
-		viewport.PinnedToTail = false
+		delta = page
 	case tea.KeyHome:
-		viewport.Offset = 0
-		viewport.PinnedToTail = false
+		absolute = true
+		target = 0
 	case tea.KeyEnd:
-		viewport.Offset = metrics.MaxOffset
-		viewport.PinnedToTail = true
+		absolute = true
+		target = metrics.MaxOffset
 	default:
 		return false
 	}
-	if viewport.Offset < 0 {
-		viewport.Offset = 0
+
+	m.interaction = m.interaction.clone()
+	local, exists := m.interaction.Viewports[id]
+	if !exists {
+		local = ViewportState{PinnedToTail: propBool(n, "follow_tail", false)}
 	}
-	if viewport.Offset > metrics.MaxOffset {
-		viewport.Offset = metrics.MaxOffset
+	if !absolute {
+		target = metrics.Offset + delta
 	}
-	m.interaction.Viewports[id] = viewport
+	target = clampInt(target, 0, metrics.MaxOffset)
+	follow := propBool(n, "follow_tail", false)
+	local.Offset = target
+	if !follow {
+		local.PinnedToTail = false
+	} else if msg.Type == tea.KeyEnd || ((msg.Type == tea.KeyDown || msg.Type == tea.KeyPgDown) && target == metrics.MaxOffset) {
+		local.PinnedToTail = true
+	} else if target < metrics.MaxOffset || msg.Type == tea.KeyHome || msg.Type == tea.KeyUp || msg.Type == tea.KeyPgUp {
+		local.PinnedToTail = false
+	}
+	m.interaction.Viewports[id] = local
 	return true
+}
+
+func (m Model) focusNext() {
+	snapshot := m.semanticSnapshot()
+	ids := a2runtime.FocusableIDs(snapshot.Document)
+	if len(ids) == 0 {
+		return
+	}
+	curr := snapshot.FocusedID
+	idx := -1
+	for i, id := range ids {
+		if id == curr {
+			idx = i
+			break
+		}
+	}
+	_ = m.controller.Focus(ids[(idx+1)%len(ids)])
+}
+
+func (m Model) focusPrev() {
+	snapshot := m.semanticSnapshot()
+	ids := a2runtime.FocusableIDs(snapshot.Document)
+	if len(ids) == 0 {
+		return
+	}
+	curr := snapshot.FocusedID
+	idx := -1
+	for i, id := range ids {
+		if id == curr {
+			idx = i
+			break
+		}
+	}
+	if idx <= 0 {
+		idx = len(ids)
+	}
+	_ = m.controller.Focus(ids[idx-1])
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
