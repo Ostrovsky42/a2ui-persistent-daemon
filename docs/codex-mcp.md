@@ -25,6 +25,8 @@ make daemon PORT=8080 SESSION=default
 
 Keep the daemon running. It prints the Unix socket path used by the interactive client.
 
+For the first P0 run, use a fresh daemon/session. The `a2ui-mcp` process owns the reliable mutation sequence for that session and P0 does not yet reconstruct it after an MCP-process restart.
+
 ## 3. Attach the real terminal UI
 
 In terminal 2, use the exact socket printed by the daemon:
@@ -47,6 +49,8 @@ startup_timeout_sec = 10
 tool_timeout_sec = 130
 enabled_tools = ["a2ui_publish", "a2ui_wait_event", "a2ui_status"]
 ```
+
+A copyable version is also stored at `.codex/a2ui-mcp.toml.example`.
 
 If `a2ui-mcp` is not on the `PATH` inherited by Codex, replace `command` with the absolute path printed by:
 
@@ -84,8 +88,9 @@ Use a prompt with this meaning:
 ```text
 Use A2UI to ask me which deployment target to use: staging or production.
 Do not choose for me and do not ask me in chat.
-Publish the choice through A2UI, wait for my real A2UI response, then continue
-based on that response and update A2UI to show the target I chose.
+Publish a selectable A2UI table, focus it, wait for my real `select` event,
+then continue based on the returned row_id and update A2UI to show the target
+I chose.
 ```
 
 The required flow is:
@@ -94,9 +99,9 @@ The required flow is:
 Codex
   -> a2ui_publish
   -> real Bubble Tea terminal UI
-  -> human selects/submits in that terminal
-  -> a2ui_wait_event
-  -> same Codex workflow receives the semantic event
+  -> human selects a row and presses Enter
+  -> a2ui_wait_event(event_types=["select"])
+  -> same Codex workflow receives row_id=staging|production
   -> Codex continues
   -> a2ui_publish updates the existing UI
 ```
@@ -107,21 +112,56 @@ Do not use `a2ui interact` for this acceptance test. Do not copy event JSON into
 
 ### `a2ui_publish`
 
-The tool accepts ordered A2UI V1 operations without wire version or sequence numbers. Example shape:
+The tool accepts ordered A2UI V1 operations without wire version or sequence numbers. For a deployment choice, use the same selectable-table semantics already covered by the repository's `omarchy-choice` fixture:
 
 ```json
 {
   "operations": [
     {
       "op": "upsert",
-      "id": "root",
+      "id": "choice-panel",
       "type": "box",
-      "props": {}
+      "parent": "root",
+      "props": {
+        "dir": "col",
+        "gap": 1,
+        "border": "rounded",
+        "variant": "panel"
+      }
     },
     {
-      "op": "text",
-      "id": "title",
-      "text": "Choose deployment target"
+      "op": "upsert",
+      "id": "choice-title",
+      "type": "text",
+      "parent": "choice-panel",
+      "props": {
+        "text": "Choose a deployment target",
+        "variant": "title"
+      }
+    },
+    {
+      "op": "upsert",
+      "id": "targets",
+      "type": "table",
+      "parent": "choice-panel",
+      "props": {
+        "columns": [
+          {"title": "Target", "width": 18},
+          {"title": "State", "width": 10}
+        ],
+        "rows": [
+          ["staging", "ready"],
+          ["production", "guarded"]
+        ],
+        "row_ids": ["staging", "production"],
+        "selectable": true,
+        "action": "deployment.select",
+        "variant": "compact"
+      }
+    },
+    {
+      "op": "focus",
+      "id": "targets"
     },
     {
       "op": "commit",
@@ -131,16 +171,18 @@ The tool accepts ordered A2UI V1 operations without wire version or sequence num
 }
 ```
 
-The exact node topology still has to obey A2UI V1 validation. `a2ui-mcp` does not bypass the daemon Session, Document reducer, or Engine.
+This is deliberately ordinary A2UI V1. `a2ui-mcp` does not create a second choice protocol and does not bypass the daemon Session, Document reducer, or Engine.
+
+After a row is activated, the semantic event contains `ev="select"`, the table ID, the action, row index, and stable `row_id`. The agent should make the decision from `row_id`, not infer it from visual position.
 
 ### `a2ui_wait_event`
 
-Typical human wait:
+For the choice above:
 
 ```json
 {
   "timeout_ms": 120000,
-  "event_types": ["submit", "select"]
+  "event_types": ["select"]
 }
 ```
 
