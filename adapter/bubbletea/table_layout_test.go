@@ -4,7 +4,7 @@ import "testing"
 
 func TestPlanTableLayoutUsesFullModeWhenPreferredWidthsFit(t *testing.T) {
 	plan := planTableLayout(TableLayoutInput{
-		AvailableWidth: 80,
+		AvailableWidth:  80,
 		AvailableHeight: 20,
 		Columns: []tableColumn{
 			{Title: "Agent", Width: 14},
@@ -30,7 +30,7 @@ func TestPlanTableLayoutUsesFullModeWhenPreferredWidthsFit(t *testing.T) {
 
 func TestPlanTableLayoutCompressesNonSelectableTableDeterministically(t *testing.T) {
 	plan := planTableLayout(TableLayoutInput{
-		AvailableWidth: 25,
+		AvailableWidth:  25,
 		AvailableHeight: 20,
 		Columns: []tableColumn{
 			{Title: "First", Width: 12},
@@ -55,7 +55,7 @@ func TestPlanTableLayoutCompressesNonSelectableTableDeterministically(t *testing
 
 func TestPlanTableLayoutUsesMasterDetailForSelectableMediumTable(t *testing.T) {
 	plan := planTableLayout(TableLayoutInput{
-		AvailableWidth: 60,
+		AvailableWidth:  60,
 		AvailableHeight: 20,
 		Columns: []tableColumn{
 			{Title: "Agent", Width: 16},
@@ -64,8 +64,8 @@ func TestPlanTableLayoutUsesMasterDetailForSelectableMediumTable(t *testing.T) {
 			{Title: "Task", Width: 28},
 			{Title: "Age", Width: 8},
 		},
-		RowCount:   8,
-		Selectable: true,
+		RowCount:    8,
+		Selectable:  true,
 		SelectedRow: 3,
 	})
 
@@ -87,7 +87,7 @@ func TestPlanTableLayoutUsesMasterDetailForSelectableMediumTable(t *testing.T) {
 
 func TestPlanTableLayoutFallsBackToRecordsWhenNarrow(t *testing.T) {
 	plan := planTableLayout(TableLayoutInput{
-		AvailableWidth: 20,
+		AvailableWidth:  20,
 		AvailableHeight: 20,
 		Columns: []tableColumn{
 			{Title: "Agent", Width: 16},
