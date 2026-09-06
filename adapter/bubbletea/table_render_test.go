@@ -88,3 +88,54 @@ func TestRendererNarrowRecordFallbackPreservesAllFields(t *testing.T) {
 		}
 	}
 }
+
+func TestRendererBoundsVisibleTableRowsByTerminalHeight(t *testing.T) {
+	eng := newTestEngine()
+	if err := eng.Apply(protocol.Operation{
+		V:      1,
+		Seq:    1,
+		Op:     protocol.OpUpsert,
+		ID:     "agents",
+		Type:   protocol.NodeTable,
+		Parent: "root",
+		Props: json.RawMessage(`{
+			"selectable": true,
+			"columns": [
+				{"title":"Agent","width":14},
+				{"title":"State","width":12}
+			],
+			"rows": [
+				["row-00","Running"],
+				["row-01","Running"],
+				["row-02","Running"],
+				["row-03","Running"],
+				["row-04","Running"],
+				["row-05","Running"],
+				["row-06","Running"],
+				["row-07","Running"],
+				["row-08","Running"],
+				["row-09","Running"]
+			],
+			"row_ids": [
+				"row:00","row:01","row:02","row:03","row:04",
+				"row:05","row:06","row:07","row:08","row:09"
+			]
+		}`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	r := NewRendererWithPreset(DefaultTheme, PresetMinimal)
+	frame := r.RenderTree(eng.Document(), "agents", eng.InputValues(), map[string]int{"agents": 0}, 80, 6)
+
+	for _, visible := range []string{"row-00", "row-01", "row-02", "row-03"} {
+		if !strings.Contains(frame, visible) {
+			t.Fatalf("expected %q in bounded table frame:\n%s", visible, frame)
+		}
+	}
+	for _, hidden := range []string{"row-04", "row-05", "row-09"} {
+		if strings.Contains(frame, hidden) {
+			t.Fatalf("row %q leaked outside visible height window:\n%s", hidden, frame)
+		}
+	}
+}
