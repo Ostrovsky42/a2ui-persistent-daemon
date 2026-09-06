@@ -20,11 +20,13 @@ func agentActivityTableRows() [][]string {
 }
 
 func TestPlanTableLayoutAgentDatasetUsesMasterDetailAtNarrowGeometry(t *testing.T) {
+	rows := agentActivityTableRows()
 	plan := planTableLayout(TableLayoutInput{
 		AvailableWidth:  80,
 		AvailableHeight: 20,
 		Columns:         agentActivityTableColumns(),
-		RowCount:        len(agentActivityTableRows()),
+		Rows:            rows,
+		RowCount:        len(rows),
 		Selectable:      true,
 		SelectedRow:     1,
 	})
@@ -35,11 +37,13 @@ func TestPlanTableLayoutAgentDatasetUsesMasterDetailAtNarrowGeometry(t *testing.
 }
 
 func TestPlanTableLayoutAgentDatasetUsesFullWhenPreferredWidthsFit(t *testing.T) {
+	rows := agentActivityTableRows()
 	plan := planTableLayout(TableLayoutInput{
 		AvailableWidth:  120,
 		AvailableHeight: 20,
 		Columns:         agentActivityTableColumns(),
-		RowCount:        len(agentActivityTableRows()),
+		Rows:            rows,
+		RowCount:        len(rows),
 		Selectable:      true,
 		SelectedRow:     1,
 	})
