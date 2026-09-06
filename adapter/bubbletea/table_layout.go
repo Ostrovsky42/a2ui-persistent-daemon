@@ -180,11 +180,13 @@ func preferredTableWidths(cols []tableColumn) []int {
 	return widths
 }
 
-// minimumReadableTableWidths derives the tabular compression floor from the
-// current table instead of from a terminal-width breakpoint. Preferred width
-// remains the V1 upper target; the floor protects a conservative fraction of
-// that target and any title/cell content that already fits inside it.
-func minimumReadableTableWidths(cols []tableColumn, rows [][]string) []int {
+// minimumReadableTableWidths derives a stable tabular compression floor from
+// the column contract rather than from current row values. Preferred width is
+// the V1 upper target; the floor protects a conservative fraction of that
+// target plus the sanitized title width, capped by preferred width. Row values
+// are intentionally excluded so streaming/replacing data cannot make the same
+// schema and terminal geometry oscillate between presentation modes.
+func minimumReadableTableWidths(cols []tableColumn, _ [][]string) []int {
 	preferred := preferredTableWidths(cols)
 	floors := make([]int, len(cols))
 	for i, col := range cols {
@@ -194,14 +196,6 @@ func minimumReadableTableWidths(cols []tableColumn, rows [][]string) []int {
 		}
 
 		observed := lipgloss.Width(SanitizeSingleLineText(col.Title))
-		for _, row := range rows {
-			if i >= len(row) {
-				continue
-			}
-			if width := lipgloss.Width(SanitizeSingleLineText(row[i])); width > observed {
-				observed = width
-			}
-		}
 		if observed > preferred[i] {
 			observed = preferred[i]
 		}
