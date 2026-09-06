@@ -12,6 +12,14 @@ func resolveTableViewportMetrics(n document.Node, selection a2runtime.TableSelec
 	var rows [][]string
 	_ = json.Unmarshal(n.Props["columns"], &cols)
 	_ = json.Unmarshal(n.Props["rows"], &rows)
+	for i := range cols {
+		cols[i].Title = SanitizeSingleLineText(cols[i].Title)
+	}
+	for i := range rows {
+		for j := range rows[i] {
+			rows[i][j] = SanitizeSingleLineText(rows[i][j])
+		}
+	}
 	selectedRow := selection.Index
 	if selectedRow < 0 {
 		selectedRow = 0
@@ -23,6 +31,7 @@ func resolveTableViewportMetrics(n document.Node, selection a2runtime.TableSelec
 		AvailableWidth:  maxW,
 		AvailableHeight: maxH,
 		Columns:         cols,
+		Rows:            rows,
 		RowCount:        len(rows),
 		Selectable:      propBool(n, "selectable", false),
 		SelectedRow:     selectedRow,
