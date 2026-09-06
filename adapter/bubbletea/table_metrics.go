@@ -31,7 +31,6 @@ func resolveTableViewportMetrics(n document.Node, selection a2runtime.TableSelec
 		AvailableWidth:  maxW,
 		AvailableHeight: maxH,
 		Columns:         cols,
-		Rows:            rows,
 		RowCount:        len(rows),
 		Selectable:      propBool(n, "selectable", false),
 		SelectedRow:     selectedRow,
