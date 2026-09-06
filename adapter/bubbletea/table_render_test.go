@@ -23,7 +23,7 @@ func TestRendererUsesMasterDetailAndPreservesSelectedRowFields(t *testing.T) {
 				{"title":"Agent","width":16},
 				{"title":"State","width":14},
 				{"title":"Attention","width":16},
-				{"title":"Task","width":28},
+				{"title":"Task","width":36},
 				{"title":"Age","width":8}
 			],
 			"rows": [
