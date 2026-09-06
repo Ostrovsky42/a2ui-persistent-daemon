@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,8 @@ import (
 	transportmcp "a2ui/transport/mcp"
 )
 
+var ErrAgentStreamConflict = errors.New("agent stream conflict")
+
 type Status struct {
 	Session        string `json:"session"`
 	Revision       uint64 `json:"revision"`
@@ -23,6 +26,15 @@ type Status struct {
 	HasClient      bool   `json:"has_client"`
 	Generation     uint64 `json:"generation"`
 	PendingPublish bool   `json:"pending_publish"`
+}
+
+type daemonHTTPError struct {
+	Status  int
+	Message string
+}
+
+func (e *daemonHTTPError) Error() string {
+	return fmt.Sprintf("daemon HTTP %d: %s", e.Status, e.Message)
 }
 
 type Client struct {
@@ -107,6 +119,10 @@ func (c *Client) hello(ctx context.Context) error {
 		return fmt.Errorf("build hello: %w", err)
 	}
 	if err := c.postMCP(ctx, msg); err != nil {
+		var daemonErr *daemonHTTPError
+		if errors.As(err, &daemonErr) && daemonErr.Status == http.StatusUnprocessableEntity && strings.Contains(strings.ToLower(daemonErr.Message), "hello only allowed in new") {
+			return fmt.Errorf("%w: daemon session %q is already negotiated by another/previous agent stream; start a fresh daemon/session before reconnecting: %v", ErrAgentStreamConflict, c.sessionID, err)
+		}
 		return fmt.Errorf("hello: %w", err)
 	}
 	return nil
@@ -136,7 +152,12 @@ func (c *Client) postMCP(ctx context.Context, msg transportmcp.Message) error {
 		return fmt.Errorf("read response: %w", readErr)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("daemon HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		message := strings.TrimSpace(string(respBody))
+		var rpcErr transportmcp.RPCError
+		if json.Unmarshal(respBody, &rpcErr) == nil && rpcErr.Message != "" {
+			message = rpcErr.Message
+		}
+		return &daemonHTTPError{Status: resp.StatusCode, Message: message}
 	}
 	return nil
 }
