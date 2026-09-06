@@ -55,6 +55,8 @@ The falling T1→T3 values show harness scheduling dominates this probe. It does
 ## Prompt corpus
 
 All prompts use current A2UI V1 nodes. Charts, local live filtering and unregistered actions are outside P0 until implemented.
+When a prompt updates a title or summary, it must use a same-ID `upsert` with new props;
+the V1 `text` operation appends and is reserved for logs or streaming content.
 
 ### P0-VIS-01 — deployment browser and filter
 
