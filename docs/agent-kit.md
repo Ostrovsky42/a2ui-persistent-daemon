@@ -68,6 +68,10 @@ read [codex-mcp.md](codex-mcp.md). The deterministic shell demo remains useful
 for regression testing, but it does not replace the real Codex + real human
 acceptance gate.
 
+For observations from the real P0 session and the proposed next iteration, read
+[live-test feedback and UX follow-up](superpowers/plans/2026-09-07-p0-live-feedback-and-ux-followup.md).
+The report distinguishes observed behavior from proposed changes and unmeasured performance.
+
 ## Focused verification
 
 ```bash
