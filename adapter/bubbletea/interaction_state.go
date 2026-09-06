@@ -10,9 +10,10 @@ type ViewportState struct {
 
 // TableViewportState is intentionally a different state machine from
 // ViewportState. It is not independently scrollable and has no pin/follow-tail
-// policy. Offset only caches the top rendered row chosen from runtime-owned
-// semantic selection plus current geometry, so adjacent selection changes can
-// avoid needless visual jumps. Reconciliation always clamps/overwrites it.
+// policy. Offset is adapter-local presentation continuity state: runtime owns
+// semantic selection, while the adapter retains the previous top visible row
+// so adjacent selection moves do not recenter unnecessarily. Reconciliation
+// constrains this state to a fixed point of current selection + geometry.
 type TableViewportState struct {
 	Offset int
 }
