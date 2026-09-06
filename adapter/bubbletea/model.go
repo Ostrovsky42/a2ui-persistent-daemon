@@ -305,8 +305,20 @@ func (m *Model) reconcileLocalState() {
 		}
 	}
 
-	// Let the renderer resolve wrapped visual-line geometry, then clamp local
-	// offsets without duplicating layout/wrap calculations here.
+	// A table window is not a second user-controlled scroll state. It is a
+	// renderer-local cache of the top visible row, derived from semantic table
+	// selection plus current geometry. There are no table-scroll key bindings or
+	// tail-pin semantics; every reconciliation clamps/overwrites this cache from
+	// renderer metrics, and removal/non-selectability prunes it.
+	for id := range m.interaction.TableViewports {
+		n, ok := snapshot.Document.Nodes[id]
+		if !ok || n.Type != protocol.NodeTable || !propBool(n, "selectable", false) {
+			delete(m.interaction.TableViewports, id)
+		}
+	}
+
+	// Let the renderer resolve wrapped visual-line and table-row geometry, then
+	// clamp local offsets without duplicating layout calculations here.
 	result := m.Renderer.RenderFrame(
 		snapshot.Document,
 		snapshot.FocusedID,
@@ -324,5 +336,12 @@ func (m *Model) reconcileLocalState() {
 		}
 		local.Offset = metrics.Offset
 		m.interaction.Viewports[id] = local
+	}
+	for id, metrics := range result.Tables {
+		n, ok := snapshot.Document.Nodes[id]
+		if !ok || n.Type != protocol.NodeTable || !propBool(n, "selectable", false) {
+			continue
+		}
+		m.interaction.TableViewports[id] = TableViewportState{Offset: metrics.Offset}
 	}
 }
