@@ -6,9 +6,15 @@
 
 **Architecture:** Add a long-lived `agentclient.Client` that owns only A2UI transport continuity (hello + reliable mutation sequence), then bind it to an `a2ui-mcp` stdio server built with the official MCP Go SDK. Existing Session/Engine/EventBroker remain the only semantic authorities.
 
-**Tech Stack:** Go 1.24, existing A2UI V1 daemon HTTP bridge, `github.com/modelcontextprotocol/go-sdk/mcp` v1.7.0, standard MCP stdio.
+**Tech Stack:** Go 1.24, existing A2UI V1 daemon HTTP bridge, `github.com/modelcontextprotocol/go-sdk/mcp` v1.4.0, standard MCP stdio.
+
+**Why v1.4.0:** newer official SDK releases inspected during implementation require Go 1.25. The repository stays on Go 1.24. Official SDK compatibility data says v1.4.0 supports the `2025-06-18` protocol currently used by Codex's shipping legacy stdio lifecycle, plus earlier/later legacy revisions in that SDK generation. Real Codex remains the final compatibility gate.
 
 **Spec:** `docs/superpowers/specs/2026-09-06-agent-connected-prototype-p0-design.md`
+
+## Current status
+
+Automated implementation is complete through packaging. Standard MCP `tools/list` and `tools/call` tests are GREEN, including two sequential publish calls preserving A2UI sequence continuity and filtered event waiting preserving observed events. Current-head full CI must still be green after the final documentation/package commits. The real Codex + real human terminal acceptance gate remains deliberately OPEN for the next hands-on session.
 
 ## Global Constraints
 
@@ -28,17 +34,13 @@
 - Modify: `go.mod`
 - Modify: `go.sum`
 
-**Interfaces:**
-- Consumes: official MCP Go SDK client/server test transport.
-- Produces: a test that requires a `newMCPServer(*agentclient.Client) *mcp.Server` factory and exactly three tools.
+- [x] **Step 1: Add Go 1.24-compatible official MCP SDK dependency**
 
-- [ ] **Step 1: Add MCP SDK dependency**
+Pinned `github.com/modelcontextprotocol/go-sdk v1.4.0`. A first attempt with v1.7.0 produced a real toolchain incompatibility because that release requires Go 1.25; the project toolchain was not raised merely for this checkpoint.
 
-Add `github.com/modelcontextprotocol/go-sdk v1.7.0` as a direct requirement and the corresponding module hashes to `go.sum`.
+- [x] **Step 2: Write the failing standard discovery test**
 
-- [ ] **Step 2: Write the failing standard discovery test**
-
-The test must connect an official `mcp.Client` and the future server via `mcp.NewInMemoryTransports()`, call `ListTools`, and require sorted names:
+The test connects an official `mcp.Client` and server via `mcp.NewInMemoryTransports()`, calls `ListTools`, and requires exactly:
 
 ```text
 a2ui_publish
@@ -46,9 +48,9 @@ a2ui_status
 a2ui_wait_event
 ```
 
-- [ ] **Step 3: Push tests-only RED and capture CI failure**
+- [x] **Step 3: Capture real RED**
 
-Expected failure: missing `newMCPServer` / missing `agentclient` implementation, not a formatting or dependency typo.
+The valid tests-only RED reached compilation and failed on missing `newMCPServer`; unrelated packages remained green.
 
 ---
 
@@ -58,29 +60,21 @@ Expected failure: missing `newMCPServer` / missing `agentclient` implementation,
 - Create: `agentclient/client.go`
 - Create: `agentclient/client_test.go`
 
-**Interfaces:**
-- Produces:
-  - `func New(serverURL, sessionID string, httpClient *http.Client) *Client`
-  - `func (c *Client) Publish(ctx context.Context, ops []protocol.Operation) error`
-  - `func (c *Client) WaitEvents(ctx context.Context, timeout time.Duration) ([]protocol.Event, error)`
-  - `func (c *Client) Status(ctx context.Context) (Status, error)`
-- Client internally owns `negotiated bool` and `nextSeq uint64`, guarded by a mutex.
+- [x] **Step 1: Characterize sequencing**
 
-- [ ] **Step 1: Write failing sequencing test**
+Two calls to `Publish` require one hello and operation sequences `1,2,3,4` rather than resetting to `1` on the second call.
 
-Use `httptest.Server` to record one hello and operation envelope sequences. Call `Publish` twice and require operation sequences to continue monotonically across calls, e.g. first call `1,2`, second call `3,4`.
+- [x] **Step 2: Characterize HTTP rejection**
 
-- [ ] **Step 2: Write failing rejection test**
+Non-2xx daemon responses preserve status and response body in the returned error.
 
-A non-2xx hello or operation response must return an error containing the HTTP status and daemon response body.
+- [x] **Step 3: Implement minimal client**
 
-- [ ] **Step 3: Implement minimal client**
+`Publish` lazily negotiates once and sends every mutation through the existing A2UI HTTP/MCP envelope path. `agentclient` does not import `document`, `engine`, or `runtime`.
 
-`Publish` lazily negotiates once, then assigns `V=protocol.Version`, `Seq=int64(nextSeq)` and forwards each operation through the existing `transport/mcp` bridge. It must not import `document`, `engine`, or `runtime`.
+- [x] **Step 4: Add WaitEvents and Status**
 
-- [ ] **Step 4: Add WaitEvents and Status characterization tests and implementation**
-
-`WaitEvents` GETs `/events?timeout=...` with caller context. `Status` GETs `/status` and decodes a typed struct.
+`WaitEvents` uses the existing `/events` endpoint with caller context and bounded daemon timeout. `Status` decodes the existing `/status` endpoint.
 
 ---
 
@@ -90,52 +84,33 @@ A non-2xx hello or operation response must return an error containing the HTTP s
 - Create: `cmd/a2ui-mcp/main.go`
 - Expand: `cmd/a2ui-mcp/main_test.go`
 
-**Interfaces:**
-- `func newMCPServer(client *agentclient.Client) *mcp.Server`
-- `func run(ctx context.Context, client *agentclient.Client) error`
+- [x] **Step 1: Make discovery GREEN**
 
-Tool inputs/outputs:
+Exactly three P0 tools are registered with the official SDK.
 
-```go
-type PublishInput struct {
-    Operations []OperationInput `json:"operations"`
-}
+- [x] **Step 2: Capture publish-call RED**
 
-type WaitEventInput struct {
-    TimeoutMS  int      `json:"timeout_ms,omitempty"`
-    EventTypes []string `json:"event_types,omitempty"`
-}
-```
+Official `tools/call` initially failed schema validation because the discovery-only server exposed empty input schemas. This proved the test was exercising the real MCP schema boundary.
 
-Status input is an empty struct.
+- [x] **Step 3: Implement publish tool**
 
-- [ ] **Step 1: Make discovery GREEN**
+The adapter accepts ergonomic operations without wire sequence/version and forwards converted V1 operations to `agentclient.Client`.
 
-Register exactly three tools with `mcp.AddTool`.
+- [x] **Step 4: Characterize filtered wait-event**
 
-- [ ] **Step 2: Write failing publish-call integration test**
+The fake daemon returns `committed` then `submit`. `a2ui_wait_event(event_types=["submit"])` must preserve both in `observed_events`, return the matching submit, and use one overall timeout.
 
-Connect official MCP client in-memory, call `a2ui_publish`, and prove the fake daemon receives normal A2UI hello + operation envelopes rather than direct document mutation.
+- [x] **Step 5: Implement wait-event tool**
 
-- [ ] **Step 3: Implement publish tool**
+The tool loops only through the existing daemon `/events` path with the remaining deadline. No second event broker exists.
 
-Convert ergonomic operation input to `protocol.Operation` without accepting caller-supplied wire version or sequence.
+- [x] **Step 6: Implement status tool and tool errors**
 
-- [ ] **Step 4: Write failing filtered wait-event test**
+Daemon errors become MCP tool errors. A normal wait with no matching event returns structured `timed_out=true`.
 
-Fake daemon first returns `committed`, then `submit`. `a2ui_wait_event` with `event_types=["submit"]` must continue waiting, preserve both in `observed_events`, return the matched submit event, and remain bounded by one overall timeout.
+- [x] **Step 7: Standard MCP automated proof**
 
-- [ ] **Step 5: Implement wait-event tool**
-
-Loop with remaining deadline. Do not create a second daemon event queue.
-
-- [ ] **Step 6: Implement status tool and typed tool errors**
-
-Transport/rejection errors become MCP tool errors. No-event timeout returns structured `timed_out=true`.
-
-- [ ] **Step 7: Run focused tests and full matrix**
-
-Run `go test ./cmd/a2ui-mcp ./agentclient`, then `go test ./...`, race, and vet.
+Official MCP client tests cover `tools/list` and `tools/call`. The implementation commit passed format, `go test ./...`, race, vet, and all three fuzz smoke steps before later packaging/docs commits invalidated that exact-head evidence.
 
 ---
 
@@ -144,45 +119,33 @@ Run `go test ./cmd/a2ui-mcp ./agentclient`, then `go test ./...`, race, and vet.
 **Files:**
 - Modify: `Makefile`
 - Create: `docs/codex-mcp.md`
+- Create: `.codex/a2ui-mcp.toml.example`
 - Modify: `.codex/skills/a2ui-daemon/SKILL.md`
+- Modify: `docs/agent-kit.md`
 
-**Interfaces:**
-- `make build` produces `bin/a2ui`, `bin/a2uid`, and `bin/a2ui-mcp`.
-- `make install` installs all three to `$(BINDIR)`.
+- [x] **Step 1: Extend build/install/uninstall**
 
-- [ ] **Step 1: Extend build/install/uninstall**
+`make build` now produces `bin/a2ui`, `bin/a2uid`, and `bin/a2ui-mcp`; install/uninstall handle all three.
 
-Add `a2ui-mcp` without changing existing binary names or targets.
+- [x] **Step 2: Document current Codex stdio configuration**
 
-- [ ] **Step 2: Document Codex stdio configuration**
+The guide uses current Codex keys: `command`, `env`, `startup_timeout_sec`, `tool_timeout_sec`, and `enabled_tools`. `command = "a2ui-mcp"` is safe when the installed binary is on Codex's inherited `PATH`; otherwise the guide requires the actual `command -v a2ui-mcp` absolute path.
 
-Provide a concrete `~/.codex/config.toml` example:
+- [x] **Step 3: Give Codex a validated interactive V1 example**
 
-```toml
-[mcp_servers.a2ui]
-command = "/home/USER/.local/bin/a2ui-mcp"
-env = { A2UI_SERVER = "http://127.0.0.1:8080", A2UI_SESSION = "default" }
-startup_timeout_sec = 10
-tool_timeout_sec = 90
-enabled_tools = ["a2ui_publish", "a2ui_wait_event", "a2ui_status"]
-```
+`docs/codex-mcp.md` uses the existing selectable-table semantics from `assets/examples/omarchy-choice.ndjson`: stable `row_ids`, `selectable=true`, action, focus, commit, then wait for `select` and consume `row_id`.
 
-Explain that the executable path must be replaced by the actual output of `command -v a2ui-mcp`; do not ship a fake hardcoded user path in runtime config.
+- [x] **Step 4: Update Codex skill**
 
-- [ ] **Step 3: Update Codex skill**
-
-Prefer callable MCP tools when available. Keep shell commands for daemon diagnostics only.
+The skill prefers callable MCP tools for real interaction and keeps shell/Make commands for lifecycle diagnostics.
 
 ---
 
-### Task 5: Verification and tomorrow's human gate
+### Task 5: Verification and real-human gate
 
-**Files:**
-- No production changes unless verification reveals a defect.
+- [ ] **Step 1: Require fresh current-head CI matrix**
 
-- [ ] **Step 1: Run current-head CI matrix**
-
-Required:
+Required on the final branch head:
 
 ```text
 format
@@ -194,10 +157,10 @@ document fuzz smoke
 IPC fuzz smoke
 ```
 
-- [ ] **Step 2: Verify standard MCP directly**
+- [x] **Step 2: Verify standard MCP directly**
 
-Automated tests must use official MCP `tools/list` and `tools/call`, not a private JSON-RPC imitation.
+Automated tests use the official MCP SDK for `tools/list` and `tools/call`, not a private JSON-RPC imitation.
 
-- [ ] **Step 3: Leave real-human acceptance explicitly OPEN**
+- [ ] **Step 3: Real Codex + real human acceptance**
 
-Tomorrow run real Codex + real `a2uid` + real Bubble Tea client. Do not claim P0 fully closed before the same-agent human roundtrip is observed.
+Run real Codex + real `a2uid` + real Bubble Tea client. The human must select in the terminal, the same Codex workflow must receive the event and continue, and a second `a2ui_publish` must visibly update the UI. `a2ui interact`, copied JSON, or a shell script acting as the human/agent cannot close this gate.
