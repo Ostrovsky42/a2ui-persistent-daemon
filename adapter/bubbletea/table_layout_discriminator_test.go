@@ -7,7 +7,7 @@ func agentActivityTableColumns() []tableColumn {
 		{Title: "Agent", Width: 16},
 		{Title: "State", Width: 14},
 		{Title: "Attention", Width: 16},
-		{Title: "Task", Width: 28},
+		{Title: "Task", Width: 36},
 		{Title: "Age", Width: 8},
 	}
 }
@@ -32,7 +32,7 @@ func TestPlanTableLayoutAgentDatasetUsesMasterDetailAtNarrowGeometry(t *testing.
 	})
 
 	if plan.Mode != TableModeMasterDetail {
-		t.Fatalf("planner discriminator: width 80 must choose master/detail for the agent dataset, got %v", plan.Mode)
+		t.Fatalf("planner discriminator: width 80 must choose master/detail for the agent table contract, got %v", plan.Mode)
 	}
 }
 
@@ -49,6 +49,6 @@ func TestPlanTableLayoutAgentDatasetUsesFullWhenPreferredWidthsFit(t *testing.T)
 	})
 
 	if plan.Mode != TableModeFull {
-		t.Fatalf("planner discriminator: wide geometry must preserve full mode for the same dataset, got %v", plan.Mode)
+		t.Fatalf("planner discriminator: wide geometry must preserve full mode for the same table contract, got %v", plan.Mode)
 	}
 }
