@@ -182,3 +182,34 @@ exit 2
 		t.Fatalf("setupCodex error = %v, want safe overwrite refusal", err)
 	}
 }
+
+func TestSetupCodexDoesNotTreatUnrelatedNotFoundAsMissingRegistration(t *testing.T) {
+	bin := t.TempDir()
+	mcpPath := writeExecutable(t, bin, "a2ui-mcp", "#!/bin/sh\nexit 0\n")
+	addMarker := filepath.Join(t.TempDir(), "add-called")
+	codexBody := fmt.Sprintf(`#!/bin/sh
+if [ "$1" = "mcp" ] && [ "$2" = "get" ]; then
+  echo "failed to load configuration: profile not found" >&2
+  exit 1
+fi
+if [ "$1" = "mcp" ] && [ "$2" = "add" ]; then
+  touch %q
+  exit 0
+fi
+exit 2
+`, addMarker)
+	codexPath := writeExecutable(t, bin, "codex", codexBody)
+
+	_, err := setupCodex(context.Background(), setupCodexOptions{
+		Server:      "http://127.0.0.1:8080",
+		Session:     "safe",
+		MCPBinary:   mcpPath,
+		CodexBinary: codexPath,
+	})
+	if err == nil || !strings.Contains(err.Error(), "inspect existing Codex MCP registration") {
+		t.Fatalf("setupCodex error = %v, want inspection failure", err)
+	}
+	if _, statErr := os.Stat(addMarker); !os.IsNotExist(statErr) {
+		t.Fatalf("codex mcp add was called after unrelated inspection error")
+	}
+}
