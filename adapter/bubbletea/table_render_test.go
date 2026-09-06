@@ -139,3 +139,77 @@ func TestRendererBoundsVisibleTableRowsByTerminalHeight(t *testing.T) {
 		}
 	}
 }
+
+func TestRendererModeDoesNotFlapWhenOnlyRowContentLengthChanges(t *testing.T) {
+	const width = 80
+	columns := []tableColumn{
+		{Title: "Agent", Width: 16},
+		{Title: "State", Width: 14},
+		{Title: "Attention", Width: 16},
+		{Title: "Task", Width: 28},
+		{Title: "Age", Width: 8},
+	}
+	plan := planTableLayout(TableLayoutInput{
+		AvailableWidth:  width,
+		AvailableHeight: 20,
+		Columns:         columns,
+		RowCount:        1,
+		Selectable:      true,
+	})
+	if plan.Mode != TableModeCompressed {
+		t.Fatalf("test precondition: structural planner should choose compressed mode, got %v", plan.Mode)
+	}
+
+	eng := newTestEngine()
+	applyRows := func(seq uint64, task string) {
+		t.Helper()
+		props, err := json.Marshal(map[string]any{
+			"selectable": true,
+			"columns": []map[string]any{
+				{"title": "Agent", "width": 16},
+				{"title": "State", "width": 14},
+				{"title": "Attention", "width": 16},
+				{"title": "Task", "width": 28},
+				{"title": "Age", "width": 8},
+			},
+			"rows":    [][]string{{"worker-1", "ready", "normal", task, "1m"}},
+			"row_ids": []string{"worker:1"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := eng.Apply(protocol.Operation{
+			V:      1,
+			Seq:    seq,
+			Op:     protocol.OpUpsert,
+			ID:     "agents",
+			Type:   protocol.NodeTable,
+			Parent: "root",
+			Props:  props,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	r := NewRendererWithPreset(DefaultTheme, PresetMinimal)
+	render := func() string {
+		return r.RenderTree(eng.Document(), "agents", eng.InputValues(), map[string]int{"agents": 0}, width, 20)
+	}
+	assertCompressedGrid := func(label, frame string) {
+		t.Helper()
+		if strings.Contains(frame, "Details") {
+			t.Fatalf("%s row values switched renderer into master/detail:\n%s", label, frame)
+		}
+		if !strings.Contains(frame, " │ ") {
+			t.Fatalf("%s renderer left tabular presentation unexpectedly:\n%s", label, frame)
+		}
+	}
+
+	applyRows(1, "sync")
+	shortFrame := render()
+	assertCompressedGrid("short", shortFrame)
+
+	applyRows(2, "this task description is deliberately longer than preferred and must not select another renderer mode")
+	longFrame := render()
+	assertCompressedGrid("long", longFrame)
+}
