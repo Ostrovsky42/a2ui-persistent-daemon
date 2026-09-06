@@ -3,6 +3,7 @@ package agentclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -93,6 +94,29 @@ func TestPublishReturnsDaemonHTTPRejection(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "422") || !strings.Contains(err.Error(), "semantic rejection") {
 		t.Fatalf("Publish error = %q, want HTTP status and body", err)
+	}
+}
+
+func TestPublishClassifiesAlreadyNegotiatedSessionAsAgentStreamConflict(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"code":-32000,"message":"hello only allowed in NEW"}`))
+	}))
+	defer server.Close()
+
+	client := New(server.URL, "reused", server.Client())
+	err := client.Publish(context.Background(), []protocol.Operation{{Op: protocol.OpCommit, Frame: "first"}})
+	if err == nil {
+		t.Fatal("Publish succeeded, want stale agent-stream rejection")
+	}
+	if !errors.Is(err, ErrAgentStreamConflict) {
+		t.Fatalf("Publish error = %v, want ErrAgentStreamConflict", err)
+	}
+	if !strings.Contains(err.Error(), "reused") || !strings.Contains(err.Error(), "fresh daemon/session") {
+		t.Fatalf("Publish error = %q, want actionable session and recovery guidance", err)
 	}
 }
 
