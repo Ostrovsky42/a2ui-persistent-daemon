@@ -30,6 +30,14 @@ security-evidence.md content blob at that base:
 e7501f67c0e28523e9c3e4a522b95b7e9527f605
 ```
 
+Machine-readable pin enforced by `conformance/omarchy_evidence_pin_test.go`:
+
+```text
+security-evidence-blob: e7501f67c0e28523e9c3e4a522b95b7e9527f605
+```
+
+Any change to `docs/security-evidence.md` must update this pin in the same change. CI recomputes the Git blob object ID from the current ledger bytes and rejects a stale proposal pin.
+
 The current Adaptive Data Surfaces R1 branch is renderer-only and is stacked from that integration base. Before an upstream Omarchy submission, replace the pin with the **final candidate commit**, rerun the ledger’s required verification commands on that exact commit, and attach the resulting CI URL. If this proposal and the ledger disagree about current security/release status, the ledger wins.
 
 This file therefore describes architecture, value, demo acceptance criteria, integration shape and maintainer cost. It does not maintain a second release-status database in prose.
