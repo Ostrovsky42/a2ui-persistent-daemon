@@ -109,11 +109,11 @@ func TestWaitEventsAndStatusUseExistingDaemonEndpoints(t *testing.T) {
 			_ = json.NewEncoder(w).Encode([]protocol.Event{{V: protocol.Version, Seq: 7, Ev: "submit", ID: "answer", Value: "staging"}})
 		case "/status":
 			_ = json.NewEncoder(w).Encode(Status{
-				Session:         "p0",
-				Revision:        12,
-				Nodes:           4,
-				HasClient:       true,
-				Generation:      9,
+				Session:        "p0",
+				Revision:       12,
+				Nodes:          4,
+				HasClient:      true,
+				Generation:     9,
 				PendingPublish: false,
 			})
 		default:
