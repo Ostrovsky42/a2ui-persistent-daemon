@@ -48,6 +48,9 @@ Implemented in the A2UI repository:
 - finite retained-state/resource limits;
 - developer smoke/reattach/startup-stress harness;
 - verified terminal-control and OSC escape sanitization;
+- stable agent-facing CLI (`a2ui send`, `a2ui wait-event`, `a2ui status`, `a2ui interact`);
+- verified end-to-end round-trip demo (`scripts/demo/roundtrip.sh` / `make demo`);
+- standard Makefile installation targets (`make build`, `make install`, `make uninstall`);
 - protocol, implementation and security documentation.
 
 ## What does not exist yet
@@ -57,7 +60,6 @@ Do not pitch these as finished:
 - final Omarchy package/install integration;
 - `omarchy a2ui` command;
 - Omarchy hotkey/menu integration;
-- a stable no-JSON agent-facing CLI for publish/wait-event/status;
 - systemd user service/socket activation;
 - Waybar integration;
 - D-Bus notifications;

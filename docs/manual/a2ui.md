@@ -81,7 +81,22 @@ The current renderer supports keyboard-first interaction:
 
 A table activation becomes a semantic `select` event. Input submission becomes a semantic `submit` event. Those events belong to the daemon/runtime path, not to the terminal widget itself.
 
-The final upstream quickstart will use a dedicated agent-facing CLI to publish a choice screen, wait for `select` or `submit`, and update the UI. That no-JSON round trip is not implemented in this documentation checkpoint, so it is intentionally not shown as an existing command here.
+The agent interacts with the running session via the `a2ui` CLI:
+
+```bash
+# Agent publishes choice screen
+a2ui send assets/examples/omarchy-choice.ndjson
+
+# Agent waits for user decision
+EVENT=$(a2ui wait-event --timeout 60s)
+echo "Received: $EVENT"
+
+# Agent updates the existing screen
+cat <<JSON | a2ui send -
+{"op":"text","id":"choice-title","text":"Deploying to staging..."}
+{"op":"commit","frame":"in-progress"}
+JSON
+```
 
 ## Close and reopen
 

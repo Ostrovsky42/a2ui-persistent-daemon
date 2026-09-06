@@ -76,10 +76,13 @@ The Omarchy/security material is split by audience:
 - [maintainer proposal draft](omarchy-submission.md) — upstream demo and submission gates;
 - [`references/PROTOCOL.md`](../references/PROTOCOL.md) — normative contract.
 
-Do not copy proposed commands from the Manual draft into agent instructions as
-if they already exist. In particular, a stable no-JSON agent CLI for
-publish/wait-event/status remains a prerequisite for the upstream-ready
-quickstart.
+The repository includes a dedicated agent CLI and round-trip verification:
+
+```bash
+make build       # Compile bin/a2ui and bin/a2uid
+make demo        # Run automated round-trip demo (send -> wait-event -> update)
+make install     # Install to $PREFIX/bin ($HOME/.local/bin)
+```
 
 ## Diagnostics
 
