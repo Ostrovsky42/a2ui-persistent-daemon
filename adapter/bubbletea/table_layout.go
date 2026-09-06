@@ -30,6 +30,7 @@ type TableLayoutInput struct {
 	RowCount        int
 	Selectable      bool
 	SelectedRow     int
+	RowOffset       int
 	Variant         string
 }
 
@@ -51,11 +52,9 @@ func planTableLayout(in TableLayoutInput) TableLayoutPlan {
 		Mode:         TableModeFull,
 		ColumnWidths: append([]int(nil), widths...),
 		VisibleCols:  allColumnIndexes(len(in.Columns)),
-		RowStart:     0,
-		RowEnd:       maxInt(in.RowCount, 0),
 	}
 	if len(in.Columns) == 0 || in.AvailableWidth <= 0 {
-		return plan
+		return finishTablePlan(in, plan)
 	}
 
 	prefixW := 0
@@ -66,7 +65,7 @@ func planTableLayout(in TableLayoutInput) TableLayoutPlan {
 	separatorTotal := separatorW * maxInt(len(in.Columns)-1, 0)
 	preferredTotal := prefixW + separatorTotal + sumTableWidths(widths)
 	if preferredTotal <= in.AvailableWidth {
-		return plan
+		return finishTablePlan(in, plan)
 	}
 
 	if masterDetailEligible(in) {
@@ -75,18 +74,93 @@ func planTableLayout(in TableLayoutInput) TableLayoutPlan {
 		plan.LeftPaneWidth = left
 		plan.RightPaneWidth = right
 		plan.VisibleCols = masterColumnPrefix(widths, left, prefixW, separatorW)
-		return plan
+		return finishTablePlan(in, plan)
 	}
 
 	minimumTotal := prefixW + separatorTotal + tableMinColumnWidth*len(in.Columns)
 	if minimumTotal <= in.AvailableWidth {
 		plan.Mode = TableModeCompressed
 		plan.ColumnWidths = shrinkTableWidths(widths, in.AvailableWidth-prefixW-separatorTotal)
-		return plan
+		return finishTablePlan(in, plan)
 	}
 
 	plan.Mode = TableModeRecords
+	return finishTablePlan(in, plan)
+}
+
+func finishTablePlan(in TableLayoutInput, plan TableLayoutPlan) TableLayoutPlan {
+	capacity := tableVisibleRowCapacity(in, plan.Mode)
+	plan.RowStart, plan.RowEnd = visibleTableRowWindow(in.RowCount, in.SelectedRow, in.RowOffset, capacity)
 	return plan
+}
+
+func tableVisibleRowCapacity(in TableLayoutInput, mode TablePresentationMode) int {
+	if in.RowCount <= 0 {
+		return 0
+	}
+	height := in.AvailableHeight
+	if height < 1 {
+		height = 1
+	}
+
+	if mode == TableModeRecords {
+		perRecord := len(in.Columns) + 1
+		if perRecord < 1 {
+			perRecord = 1
+		}
+		capacity := height / perRecord
+		if capacity < 1 {
+			capacity = 1
+		}
+		if capacity > in.RowCount {
+			capacity = in.RowCount
+		}
+		return capacity
+	}
+
+	chrome := 2
+	if in.Variant == "dense" {
+		chrome = 1
+	}
+	capacity := height - chrome
+	if capacity < 1 {
+		capacity = 1
+	}
+	if capacity > in.RowCount {
+		capacity = in.RowCount
+	}
+	return capacity
+}
+
+func visibleTableRowWindow(rowCount, selectedRow, offset, capacity int) (int, int) {
+	if rowCount <= 0 || capacity <= 0 {
+		return 0, 0
+	}
+	if capacity > rowCount {
+		capacity = rowCount
+	}
+	if selectedRow < 0 {
+		selectedRow = 0
+	}
+	if selectedRow >= rowCount {
+		selectedRow = rowCount - 1
+	}
+	maxStart := rowCount - capacity
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > maxStart {
+		offset = maxStart
+	}
+	if selectedRow < offset {
+		offset = selectedRow
+	} else if selectedRow >= offset+capacity {
+		offset = selectedRow - capacity + 1
+	}
+	if offset > maxStart {
+		offset = maxStart
+	}
+	return offset, offset + capacity
 }
 
 func preferredTableWidths(cols []tableColumn) []int {
