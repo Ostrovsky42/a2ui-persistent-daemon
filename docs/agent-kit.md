@@ -3,6 +3,18 @@
 Use this document from the Go module root: the directory containing `go.mod`
 and `Makefile`.
 
+For first-time Codex onboarding, prefer [codex-mcp.md](codex-mcp.md). The
+supported high-level path is:
+
+```bash
+make install
+a2ui setup-codex
+# start daemon + terminal client
+a2ui doctor
+```
+
+Use this document for lower-level daemon and verification operations.
+
 ## Fast verification
 
 Before reporting daemon transport success, run both independent smoke checks:
@@ -63,10 +75,25 @@ make build
 make install
 ```
 
-For the current Codex configuration and the real human round-trip procedure,
-read [codex-mcp.md](codex-mcp.md). The deterministic shell demo remains useful
-for regression testing, but it does not replace the real Codex + real human
-acceptance gate.
+Register it in Codex through the supported CLI path:
+
+```bash
+a2ui setup-codex --server http://127.0.0.1:8080 --session smoke
+```
+
+Then, after daemon/client startup, verify the full local preflight:
+
+```bash
+a2ui doctor --server http://127.0.0.1:8080 --session smoke
+```
+
+Use `a2ui doctor --json` for machine-readable diagnostics. The doctor validates
+the Codex registration, daemon/session binding, and terminal attachment; it
+reports optional smoke dependencies separately as WARN.
+
+The deterministic shell demo remains useful for regression testing, but it does
+not replace the real Codex + real human acceptance gate in
+[`acceptance/CODEX_HUMAN_P0_1.md`](acceptance/CODEX_HUMAN_P0_1.md).
 
 ## Focused verification
 
@@ -112,8 +139,11 @@ make install     # Install all three binaries to $PREFIX/bin ($HOME/.local/bin)
 
 | Symptom | Action |
 | --- | --- |
+| first-time setup or unclear local state | Run `a2ui doctor`; follow its `FIX:` line for each FAIL/WARN that matters to the current workflow. |
 | `cannot find main module` | `cd` to the directory containing `go.mod`; do not run Go commands from the archive wrapper directory. |
-| `a2ui-mcp` not found by Codex | Run `make install`, then `command -v a2ui-mcp`; use that absolute path in `~/.codex/config.toml` if Codex does not inherit the same `PATH`. |
+| `a2ui-mcp` not found | Run `make install`, verify `command -v a2ui-mcp`, then rerun `a2ui setup-codex`. |
+| Codex MCP registration missing/mismatched | Inspect `codex mcp get a2ui --json`; use `a2ui setup-codex` for a missing entry or `a2ui setup-codex --replace` only when replacement is intentional. |
+| `agent stream conflict` / session already negotiated | The current MCP process cannot reconstruct the previous reliable sequence. Start a fresh daemon/session; do not retry blindly against the stale session. |
 | MCP server starts but `a2ui_status` cannot reach daemon | Confirm `a2uid` is running on the `A2UI_SERVER` configured for the MCP process. |
 | `a2ui_status` reports `has_client=false` | Attach the real Bubble Tea client before a human wait. |
 | `no Unix socket` | Confirm the daemon is still running and copy the exact socket path it printed. |
@@ -124,8 +154,10 @@ make install     # Install all three binaries to $PREFIX/bin ($HOME/.local/bin)
 
 ## Release status
 
-`make test` and `make test-race` remain release gates. Smoke or focused E2E
-success never replaces them.
+Current-head format, shipped-binary build, tests, race, vet, and fuzz smoke are
+the branch CI gates. Transport smoke or focused E2E success never replaces the
+full matrix, and the automated matrix never replaces the real human acceptance
+gate for P0.1.
 
 The documentation evidence ledger is authoritative for known open or
 unverified security claims. A prose change must not silently promote an
