@@ -40,6 +40,8 @@ progress
 
 `upsert` is full props replacement. Missing fields return to defaults.
 
+For an existing ID, omitted `parent` keeps the current parent. An explicit different `parent` atomically relocates the surviving node/subtree to that existing container. Omitted `index` preserves same-parent order or appends after a parent change; explicit `index` reorders within the final parent, with an out-of-range index appending. Do not remove/recreate a node merely to move it: same-type relocation preserves runtime identity keyed by the surviving ID.
+
 `props` is shallow top-level merge. Do not assume nested merge.
 
 Failed mutations do not partially apply. Read returned error and correct the next operation.
@@ -120,7 +122,7 @@ The daemon may keep the same A2UI Session/Document/Runtime alive while terminal 
 
 ## Hardened session
 
-When a host asks for hardened envelopes, wait for/perform A2UI hello negotiation and honor advertised limits/capabilities. Reliable mutation sequence numbers are contiguous; never intentionally skip one.
+When a host asks for hardened envelopes, wait for/perform A2UI hello negotiation and honor advertised limits/capabilities. `hello_ack.components` is the complete node-type allowlist for that session: never send a component absent from it. If a newer component is unavailable, degrade before sending using advertised V1 components; unknown received node types remain strict errors. Reliable mutation sequence numbers are contiguous; never intentionally skip one.
 
 ## Minimal example
 
