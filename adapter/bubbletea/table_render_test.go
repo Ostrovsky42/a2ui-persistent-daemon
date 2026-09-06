@@ -161,7 +161,7 @@ func TestRendererModeDoesNotFlapWhenOnlyRowContentLengthChanges(t *testing.T) {
 	}
 
 	eng := newTestEngine()
-	applyRows := func(seq uint64, task string) {
+	applyRows := func(seq int64, task string) {
 		t.Helper()
 		props, err := json.Marshal(map[string]any{
 			"selectable": true,
