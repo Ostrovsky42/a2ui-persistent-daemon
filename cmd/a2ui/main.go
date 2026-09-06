@@ -23,11 +23,33 @@ func resolveClientSocket(explicit, xdg string, uid int) string {
 }
 
 func main() {
-	var (
-		socket     = flag.String("socket", "", "Unix socket path (default: $XDG_RUNTIME_DIR/a2ui/a2ui.sock)")
-		presetName = flag.String("preset", "dashboard", "presentation preset: minimal, dashboard, or dense")
-	)
-	flag.Parse()
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "send":
+			runSend(os.Args[2:])
+			return
+		case "wait-event":
+			runWaitEvent(os.Args[2:])
+			return
+		case "status":
+			runStatus(os.Args[2:])
+			return
+		case "interact":
+			runInteract(os.Args[2:])
+			return
+		case "-h", "--help", "help":
+			printUsage()
+			return
+		}
+	}
+	runTUI(os.Args[1:])
+}
+
+func runTUI(args []string) {
+	fs := flag.NewFlagSet("a2ui", flag.ExitOnError)
+	socket := fs.String("socket", "", "Unix socket path (default: $XDG_RUNTIME_DIR/a2ui/a2ui.sock)")
+	presetName := fs.String("preset", "dashboard", "presentation preset: minimal, dashboard, or dense")
+	_ = fs.Parse(args)
 
 	preset, err := a2tea.ParsePreset(*presetName)
 	if err != nil {

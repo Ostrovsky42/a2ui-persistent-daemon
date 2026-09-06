@@ -1,7 +1,9 @@
 package daemon
 
 import (
+	"context"
 	"sync"
+	"time"
 
 	"a2ui/engine"
 	"a2ui/protocol"
@@ -20,6 +22,7 @@ type Daemon struct {
 	agentMu sync.Mutex
 	lease   clientLease
 	updates chan struct{}
+	eventCh chan struct{}
 
 	clientMu   sync.Mutex
 	activeConn interface{ Close() error }
@@ -36,6 +39,7 @@ func New(sessionID string, limits protocol.Limits, actions *a2runtime.ActionRegi
 		Actions: actions,
 		limits:  limits,
 		updates: make(chan struct{}, 1),
+		eventCh: make(chan struct{}, 1),
 	}
 }
 
@@ -43,6 +47,47 @@ func (d *Daemon) signalSnapshot() {
 	select {
 	case d.updates <- struct{}{}:
 	default:
+	}
+}
+
+func (d *Daemon) signalEvents() {
+	select {
+	case d.eventCh <- struct{}{}:
+	default:
+	}
+}
+
+// HasActiveClient reports whether an interactive terminal client holds the lease.
+func (d *Daemon) HasActiveClient() bool {
+	return d.lease.owner() != ""
+}
+
+// WaitEvents drains immediately if events are already pending, or waits up to
+// maxWait for new semantic events to arrive.
+func (d *Daemon) WaitEvents(ctx context.Context, maxWait time.Duration) []protocol.Event {
+	events := d.DrainEvents()
+	if len(events) > 0 {
+		return events
+	}
+	if maxWait <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(maxWait)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return d.DrainEvents()
+		case <-timer.C:
+			return d.DrainEvents()
+		case <-d.eventCh:
+			events = d.DrainEvents()
+			if len(events) > 0 {
+				return events
+			}
+		}
 	}
 }
 

@@ -1,9 +1,11 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"a2ui/protocol"
 	"a2ui/transport/mcp"
@@ -13,6 +15,35 @@ import (
 // the daemon-owned Session/Engine. It deliberately performs no rendering and
 // never acknowledges publication on behalf of a terminal client.
 func (d *Daemon) HandleMCPMessage(msg mcp.Message) (*mcp.Message, *protocol.Error) {
+	if msg.Method == "a2ui/drain_events" || msg.Method == "a2ui/wait_event" {
+		timeout := 0 * time.Second
+		if msg.Method == "a2ui/wait_event" {
+			timeout = 30 * time.Second
+			var params struct {
+				TimeoutMs int `json:"timeout_ms"`
+			}
+			if len(msg.Params) > 0 {
+				_ = json.Unmarshal(msg.Params, &params)
+				if params.TimeoutMs > 0 {
+					timeout = time.Duration(params.TimeoutMs) * time.Millisecond
+				}
+			}
+		}
+		events := d.WaitEvents(context.Background(), timeout)
+		if events == nil {
+			events = []protocol.Event{}
+		}
+		resRaw, err := json.Marshal(map[string]any{"events": events})
+		if err != nil {
+			return nil, protocol.NewError("mcp.encode_failed", err.Error())
+		}
+		return &mcp.Message{
+			JSONRPC: "2.0",
+			ID:      msg.ID,
+			Result:  resRaw,
+		}, nil
+	}
+
 	env, perr := mcp.EnvelopeFromMessage(msg)
 	if perr != nil {
 		return nil, perr
@@ -65,9 +96,20 @@ func (d *Daemon) DrainMCPNotifications() ([]mcp.Message, error) {
 	return out, nil
 }
 
-// ServeHTTP exposes the same stateless MCP Streamable HTTP bridge as the
-// standalone runner while keeping all semantic state daemon-side.
+// ServeHTTP exposes the stateless MCP Streamable HTTP bridge as well as
+// ergonomics GET /status and GET /events endpoints.
 func (d *Daemon) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if req.Method == http.MethodGet {
+		switch req.URL.Path {
+		case "/status":
+			d.serveStatus(w, req)
+			return
+		case "/events":
+			d.serveEvents(w, req)
+			return
+		}
+	}
+
 	if req.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -106,6 +148,38 @@ func (d *Daemon) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func (d *Daemon) serveStatus(w http.ResponseWriter, req *http.Request) {
+	doc := d.Engine.Document()
+	curGen, pending := d.Engine.PublicationGeneration()
+	status := map[string]any{
+		"session":         d.Session.ID(),
+		"revision":        doc.Revision,
+		"nodes":           len(doc.Nodes),
+		"has_client":      d.HasActiveClient(),
+		"generation":      curGen,
+		"pending_publish": pending,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(status)
+}
+
+func (d *Daemon) serveEvents(w http.ResponseWriter, req *http.Request) {
+	timeout := 30 * time.Second
+	if q := req.URL.Query().Get("timeout"); q != "" {
+		if dur, err := time.ParseDuration(q); err == nil && dur >= 0 {
+			timeout = dur
+		}
+	}
+	events := d.WaitEvents(req.Context(), timeout)
+	if events == nil {
+		events = []protocol.Event{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(events)
 }
 
 func writeMCPError(w http.ResponseWriter, status, code int, message string) {

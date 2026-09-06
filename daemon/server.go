@@ -154,12 +154,15 @@ func (d *Daemon) handleClient(parent context.Context, conn net.Conn) {
 					_ = writeClientMessage(conn, writer, ipc.Message{V: ipc.Version, Kind: ipc.KindError, RequestID: msg.RequestID, Error: ierr})
 					continue
 				}
+				d.signalEvents()
 				if err := d.writeSnapshot(conn, writer, msg.RequestID); err != nil {
 					return
 				}
 			case ipc.KindFramePublished:
 				if ierr := d.ackPublication(msg.PublicationGeneration); ierr != nil {
 					_ = writeClientMessage(conn, writer, ipc.Message{V: ipc.Version, Kind: ipc.KindError, RequestID: msg.RequestID, Error: ierr})
+				} else {
+					d.signalEvents()
 				}
 			default:
 				_ = writeClientMessage(conn, writer, ipc.Message{V: ipc.Version, Kind: ipc.KindError, RequestID: msg.RequestID, Error: ipc.NewError("ipc.invalid_message", "message is not valid after attach")})
