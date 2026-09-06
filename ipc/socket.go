@@ -26,8 +26,12 @@ func ListenUnix(path string) (*net.UnixListener, *Error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, NewError("ipc.socket_setup_failed", err.Error())
 	}
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return nil, NewError("ipc.socket_setup_failed", err.Error())
+	if info, err := os.Stat(dir); err == nil {
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok && int(stat.Uid) == os.Getuid() {
+			if err := os.Chmod(dir, 0o700); err != nil {
+				return nil, NewError("ipc.socket_setup_failed", err.Error())
+			}
+		}
 	}
 
 	// Serialize stale-socket probing, removal and bind for this pathname.
