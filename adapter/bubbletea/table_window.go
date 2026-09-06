@@ -2,67 +2,118 @@ package bubbletea
 
 import (
 	"encoding/json"
+	"strings"
 
 	"a2ui/document"
 	a2runtime "a2ui/runtime"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// renderTableWindowed applies renderer-local vertical windowing before handing
-// the projected row slice to the existing adaptive table renderer. The source
-// node and runtime selection are copied; authoritative state is never mutated.
+// renderTableWindowed computes one plan from the complete sanitized dataset,
+// then applies renderer-local row windowing to that plan. It never re-plans a
+// projected row slice, so presentation mode and readable-width decisions are
+// stable across vertical windowing.
 func (r *Renderer) renderTableWindowed(n document.Node, focused bool, selection a2runtime.TableSelection, maxW, maxH, rowOffset int) string {
-	var cols []tableColumn
-	var rows [][]string
-	_ = json.Unmarshal(n.Props["columns"], &cols)
-	_ = json.Unmarshal(n.Props["rows"], &rows)
-	if len(cols) == 0 || len(rows) == 0 {
-		return r.renderTable(n, focused, selection, maxW)
+	cols, rows := decodeSanitizedTable(n)
+	if len(cols) == 0 {
+		return ""
 	}
 
 	selectedRow := selection.Index
 	if selectedRow < 0 {
 		selectedRow = 0
 	}
-	if selectedRow >= len(rows) {
+	if len(rows) > 0 && selectedRow >= len(rows) {
 		selectedRow = len(rows) - 1
 	}
+	selectable := propBool(n, "selectable", false)
+	variant := propString(n, "variant", "normal")
 	plan := planTableLayout(TableLayoutInput{
 		AvailableWidth:  maxW,
 		AvailableHeight: maxH,
 		Columns:         cols,
+		Rows:            rows,
 		RowCount:        len(rows),
-		Selectable:      propBool(n, "selectable", false),
+		Selectable:      selectable,
 		SelectedRow:     selectedRow,
 		RowOffset:       rowOffset,
-		Variant:         propString(n, "variant", "normal"),
+		Variant:         variant,
 	})
-	if plan.RowStart == 0 && plan.RowEnd == len(rows) {
-		return r.renderTable(n, focused, selection, maxW)
+
+	visibleRows := rows
+	visibleSelection := selectedRow
+	if plan.RowStart >= 0 && plan.RowEnd >= plan.RowStart && plan.RowEnd <= len(rows) && (plan.RowStart != 0 || plan.RowEnd != len(rows)) {
+		visibleRows = rows[plan.RowStart:plan.RowEnd]
+		visibleSelection = selectedRow - plan.RowStart
 	}
 
-	projected := n
-	projected.Props = cloneNodeProps(n.Props)
-	projectedRows := append([][]string(nil), rows[plan.RowStart:plan.RowEnd]...)
-	rowsJSON, _ := json.Marshal(projectedRows)
-	projected.Props["rows"] = rowsJSON
-
-	if rawIDs := n.Props["row_ids"]; len(rawIDs) > 0 {
-		var rowIDs []string
-		if json.Unmarshal(rawIDs, &rowIDs) == nil && len(rowIDs) == len(rows) {
-			idsJSON, _ := json.Marshal(append([]string(nil), rowIDs[plan.RowStart:plan.RowEnd]...))
-			projected.Props["row_ids"] = idsJSON
-		}
+	switch plan.Mode {
+	case TableModeRecords:
+		return r.renderTableRecords(cols, visibleRows, focused, selectable, visibleSelection, maxW)
+	case TableModeMasterDetail:
+		return r.renderPlannedTableMasterDetail(cols, visibleRows, focused, selectable, visibleSelection, variant, plan)
+	default:
+		return r.renderTableGrid(cols, visibleRows, focused, selectable, visibleSelection, variant, plan.ColumnWidths)
 	}
-
-	projectedSelection := selection
-	projectedSelection.Index = selectedRow - plan.RowStart
-	return r.renderTable(projected, focused, projectedSelection, maxW)
 }
 
-func cloneNodeProps(in map[string]json.RawMessage) map[string]json.RawMessage {
-	out := make(map[string]json.RawMessage, len(in))
-	for key, value := range in {
-		out[key] = append(json.RawMessage(nil), value...)
+func decodeSanitizedTable(n document.Node) ([]tableColumn, [][]string) {
+	var cols []tableColumn
+	var rows [][]string
+	_ = json.Unmarshal(n.Props["columns"], &cols)
+	_ = json.Unmarshal(n.Props["rows"], &rows)
+	for i := range cols {
+		cols[i].Title = SanitizeSingleLineText(cols[i].Title)
 	}
-	return out
+	for i := range rows {
+		for j := range rows[i] {
+			rows[i][j] = SanitizeSingleLineText(rows[i][j])
+		}
+	}
+	return cols, rows
+}
+
+func (r *Renderer) renderPlannedTableMasterDetail(cols []tableColumn, rows [][]string, focused, selectable bool, selectedRow int, variant string, plan TableLayoutPlan) string {
+	if len(rows) == 0 || selectedRow < 0 || selectedRow >= len(rows) {
+		return r.renderTableRecords(cols, rows, focused, selectable, selectedRow, plan.LeftPaneWidth+tablePaneSeparatorWidth+plan.RightPaneWidth)
+	}
+
+	masterCols := make([]tableColumn, 0, len(plan.VisibleCols))
+	masterRows := make([][]string, len(rows))
+	masterPreferred := make([]int, 0, len(plan.VisibleCols))
+	masterFloors := make([]int, 0, len(plan.VisibleCols))
+	preferred := preferredTableWidths(cols)
+	for _, columnIndex := range plan.VisibleCols {
+		if columnIndex < 0 || columnIndex >= len(cols) {
+			continue
+		}
+		masterCols = append(masterCols, cols[columnIndex])
+		masterPreferred = append(masterPreferred, preferred[columnIndex])
+		floor := tableMinColumnWidth
+		if columnIndex < len(plan.ReadableWidths) {
+			floor = plan.ReadableWidths[columnIndex]
+		}
+		masterFloors = append(masterFloors, floor)
+		for rowIndex, row := range rows {
+			value := ""
+			if columnIndex < len(row) {
+				value = row[columnIndex]
+			}
+			masterRows[rowIndex] = append(masterRows[rowIndex], value)
+		}
+	}
+	if len(masterCols) == 0 {
+		return r.renderTableRecords(cols, rows, focused, selectable, selectedRow, plan.LeftPaneWidth+tablePaneSeparatorWidth+plan.RightPaneWidth)
+	}
+
+	prefixW := 0
+	if selectable {
+		prefixW = tableSelectablePrefixW
+	}
+	separatorW := tableColumnSeparatorWidth(variant) * maxInt(len(masterCols)-1, 0)
+	budget := maxInt(plan.LeftPaneWidth-prefixW-separatorW, sumTableWidths(masterFloors))
+	masterWidths := shrinkTableWidthsToFloors(masterPreferred, masterFloors, budget)
+	master := r.renderTableGrid(masterCols, masterRows, focused, selectable, selectedRow, variant, masterWidths)
+	detail := r.renderTableDetail(cols, rows[selectedRow], plan.RightPaneWidth)
+	return lipgloss.JoinHorizontal(lipgloss.Top, master, strings.Repeat(" ", tablePaneSeparatorWidth), detail)
 }
