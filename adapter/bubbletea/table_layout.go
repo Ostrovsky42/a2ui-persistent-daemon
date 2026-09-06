@@ -1,5 +1,7 @@
 package bubbletea
 
+import "github.com/charmbracelet/lipgloss"
+
 // TablePresentationMode is renderer-local presentation state. It is not part
 // of the A2UI wire protocol or authoritative Document.
 type TablePresentationMode int
@@ -12,13 +14,13 @@ const (
 )
 
 const (
-	tableMinColumnWidth     = 3
-	tableSelectablePrefixW  = 2
-	tableNormalSeparatorW   = 3
-	tableCompactSeparatorW  = 1
-	tableMasterMinWidth     = 18
-	tableDetailMinWidth     = 24
-	tablePaneSeparatorWidth = 3
+	tableMinColumnWidth            = 3
+	tableSelectablePrefixW         = 2
+	tableNormalSeparatorW          = 3
+	tableCompactSeparatorW         = 1
+	tablePaneSeparatorWidth        = 3
+	tableReadablePreferredNumerator   = 3
+	tableReadablePreferredDenominator = 4
 )
 
 // TableLayoutInput contains only deterministic renderer inputs. Semantic
@@ -27,6 +29,7 @@ type TableLayoutInput struct {
 	AvailableWidth  int
 	AvailableHeight int
 	Columns         []tableColumn
+	Rows            [][]string
 	RowCount        int
 	Selectable      bool
 	SelectedRow     int
@@ -39,6 +42,7 @@ type TableLayoutInput struct {
 type TableLayoutPlan struct {
 	Mode           TablePresentationMode
 	ColumnWidths   []int
+	ReadableWidths []int
 	VisibleCols    []int
 	LeftPaneWidth  int
 	RightPaneWidth int
@@ -48,10 +52,12 @@ type TableLayoutPlan struct {
 
 func planTableLayout(in TableLayoutInput) TableLayoutPlan {
 	widths := preferredTableWidths(in.Columns)
+	readable := minimumReadableTableWidths(in.Columns, in.Rows)
 	plan := TableLayoutPlan{
-		Mode:         TableModeFull,
-		ColumnWidths: append([]int(nil), widths...),
-		VisibleCols:  allColumnIndexes(len(in.Columns)),
+		Mode:           TableModeFull,
+		ColumnWidths:   append([]int(nil), widths...),
+		ReadableWidths: append([]int(nil), readable...),
+		VisibleCols:    allColumnIndexes(len(in.Columns)),
 	}
 	if len(in.Columns) == 0 || in.AvailableWidth <= 0 {
 		return finishTablePlan(in, plan)
@@ -68,19 +74,19 @@ func planTableLayout(in TableLayoutInput) TableLayoutPlan {
 		return finishTablePlan(in, plan)
 	}
 
-	if masterDetailEligible(in) {
-		left, right := masterDetailPaneWidths(in.AvailableWidth)
-		plan.Mode = TableModeMasterDetail
-		plan.LeftPaneWidth = left
-		plan.RightPaneWidth = right
-		plan.VisibleCols = masterColumnPrefix(widths, left, prefixW, separatorW)
+	readableTotal := prefixW + separatorTotal + sumTableWidths(readable)
+	if readableTotal <= in.AvailableWidth {
+		plan.Mode = TableModeCompressed
+		plan.ColumnWidths = shrinkTableWidthsToFloors(widths, readable, in.AvailableWidth-prefixW-separatorTotal)
 		return finishTablePlan(in, plan)
 	}
 
-	minimumTotal := prefixW + separatorTotal + tableMinColumnWidth*len(in.Columns)
-	if minimumTotal <= in.AvailableWidth {
-		plan.Mode = TableModeCompressed
-		plan.ColumnWidths = shrinkTableWidths(widths, in.AvailableWidth-prefixW-separatorTotal)
+	if masterDetailEligible(in, readable) {
+		left, right := masterDetailPaneWidths(in, readable)
+		plan.Mode = TableModeMasterDetail
+		plan.LeftPaneWidth = left
+		plan.RightPaneWidth = right
+		plan.VisibleCols = masterColumnPrefix(readable, left, prefixW, separatorW)
 		return finishTablePlan(in, plan)
 	}
 
@@ -174,6 +180,49 @@ func preferredTableWidths(cols []tableColumn) []int {
 	return widths
 }
 
+// minimumReadableTableWidths derives the tabular compression floor from the
+// current table instead of from a terminal-width breakpoint. Preferred width
+// remains the V1 upper target; the floor protects a conservative fraction of
+// that target and any title/cell content that already fits inside it.
+func minimumReadableTableWidths(cols []tableColumn, rows [][]string) []int {
+	preferred := preferredTableWidths(cols)
+	floors := make([]int, len(cols))
+	for i, col := range cols {
+		floor := ceilMulDiv(preferred[i], tableReadablePreferredNumerator, tableReadablePreferredDenominator)
+		if floor < tableMinColumnWidth {
+			floor = tableMinColumnWidth
+		}
+
+		observed := lipgloss.Width(SanitizeSingleLineText(col.Title))
+		for _, row := range rows {
+			if i >= len(row) {
+				continue
+			}
+			if width := lipgloss.Width(SanitizeSingleLineText(row[i])); width > observed {
+				observed = width
+			}
+		}
+		if observed > preferred[i] {
+			observed = preferred[i]
+		}
+		if observed > floor {
+			floor = observed
+		}
+		if floor > preferred[i] {
+			floor = preferred[i]
+		}
+		floors[i] = floor
+	}
+	return floors
+}
+
+func ceilMulDiv(value, numerator, denominator int) int {
+	if value <= 0 || numerator <= 0 || denominator <= 0 {
+		return 0
+	}
+	return (value*numerator + denominator - 1) / denominator
+}
+
 func tableColumnSeparatorWidth(variant string) int {
 	if variant == "compact" || variant == "dense" {
 		return tableCompactSeparatorW
@@ -181,24 +230,45 @@ func tableColumnSeparatorWidth(variant string) int {
 	return tableNormalSeparatorW
 }
 
-func masterDetailEligible(in TableLayoutInput) bool {
-	if !in.Selectable || in.RowCount <= 0 || len(in.Columns) < 4 {
+func masterDetailEligible(in TableLayoutInput, readable []int) bool {
+	if !in.Selectable || in.RowCount <= 0 || len(in.Columns) < 4 || len(readable) == 0 {
 		return false
 	}
-	minimum := tableMasterMinWidth + tablePaneSeparatorWidth + tableDetailMinWidth
-	return in.AvailableWidth >= minimum
+	masterMin, detailMin := masterDetailMinimumPaneWidths(in.Columns, readable)
+	return in.AvailableWidth >= masterMin+tablePaneSeparatorWidth+detailMin
 }
 
-func masterDetailPaneWidths(available int) (int, int) {
-	left := available * 2 / 5
-	if left < tableMasterMinWidth {
-		left = tableMasterMinWidth
+func masterDetailMinimumPaneWidths(cols []tableColumn, readable []int) (int, int) {
+	masterMin := tableSelectablePrefixW + tableMinColumnWidth
+	if len(readable) > 0 {
+		masterMin = tableSelectablePrefixW + readable[0]
 	}
-	maxLeft := available - tablePaneSeparatorWidth - tableDetailMinWidth
+
+	detailMin := tableMinColumnWidth
+	for i, col := range cols {
+		valueFloor := tableMinColumnWidth
+		if i < len(readable) {
+			valueFloor = readable[i]
+		}
+		lineWidth := lipgloss.Width(SanitizeSingleLineText(col.Title)) + 2 + valueFloor
+		if lineWidth > detailMin {
+			detailMin = lineWidth
+		}
+	}
+	return masterMin, detailMin
+}
+
+func masterDetailPaneWidths(in TableLayoutInput, readable []int) (int, int) {
+	masterMin, detailMin := masterDetailMinimumPaneWidths(in.Columns, readable)
+	left := in.AvailableWidth * 2 / 5
+	if left < masterMin {
+		left = masterMin
+	}
+	maxLeft := in.AvailableWidth - tablePaneSeparatorWidth - detailMin
 	if left > maxLeft {
 		left = maxLeft
 	}
-	right := available - tablePaneSeparatorWidth - left
+	right := in.AvailableWidth - tablePaneSeparatorWidth - left
 	return left, right
 }
 
@@ -230,12 +300,16 @@ func masterColumnPrefix(widths []int, paneWidth, prefixW, separatorW int) []int 
 	return visible
 }
 
-func shrinkTableWidths(widths []int, budget int) []int {
+func shrinkTableWidthsToFloors(widths, floors []int, budget int) []int {
 	out := append([]int(nil), widths...)
 	for sumTableWidths(out) > budget {
 		widest := -1
 		for i, width := range out {
-			if width > tableMinColumnWidth && (widest < 0 || width > out[widest]) {
+			floor := tableMinColumnWidth
+			if i < len(floors) && floors[i] > floor {
+				floor = floors[i]
+			}
+			if width > floor && (widest < 0 || width > out[widest]) {
 				widest = i
 			}
 		}
@@ -245,6 +319,16 @@ func shrinkTableWidths(widths []int, budget int) []int {
 		out[widest]--
 	}
 	return out
+}
+
+// shrinkTableWidths is retained for internal callers that only need the base
+// hard floor. Adaptive planning uses shrinkTableWidthsToFloors instead.
+func shrinkTableWidths(widths []int, budget int) []int {
+	floors := make([]int, len(widths))
+	for i := range floors {
+		floors[i] = tableMinColumnWidth
+	}
+	return shrinkTableWidthsToFloors(widths, floors, budget)
 }
 
 func allColumnIndexes(count int) []int {
