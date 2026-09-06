@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"a2ui/daemon"
 	"a2ui/protocol"
 	transportmcp "a2ui/transport/mcp"
 )
@@ -117,6 +118,32 @@ func TestPublishClassifiesAlreadyNegotiatedSessionAsAgentStreamConflict(t *testi
 	}
 	if !strings.Contains(err.Error(), "reused") || !strings.Contains(err.Error(), "fresh daemon/session") {
 		t.Fatalf("Publish error = %q, want actionable session and recovery guidance", err)
+	}
+}
+
+func TestPublishClassifiesRealDaemonReusedSessionAsAgentStreamConflict(t *testing.T) {
+	t.Parallel()
+
+	d := daemon.New("real-reused", protocol.DefaultLimits(), nil)
+	server := httptest.NewServer(d)
+	defer server.Close()
+
+	ctx := context.Background()
+	first := New(server.URL, "real-reused", server.Client())
+	if err := first.Publish(ctx, nil); err != nil {
+		t.Fatalf("first agent stream negotiate: %v", err)
+	}
+
+	second := New(server.URL, "real-reused", server.Client())
+	err := second.Publish(ctx, nil)
+	if err == nil {
+		t.Fatal("second agent stream negotiation succeeded, want explicit conflict")
+	}
+	if !errors.Is(err, ErrAgentStreamConflict) {
+		t.Fatalf("second agent stream error = %v, want ErrAgentStreamConflict", err)
+	}
+	if !strings.Contains(err.Error(), "real-reused") || !strings.Contains(err.Error(), "fresh daemon/session") {
+		t.Fatalf("second agent stream error = %q, want actionable real-session recovery guidance", err)
 	}
 }
 
