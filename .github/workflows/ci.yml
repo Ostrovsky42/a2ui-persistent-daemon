@@ -19,6 +19,8 @@ jobs:
           cache: false
       - name: Format gate
         run: test -z "$(gofmt -l .)"
+      - name: Build shipped binaries
+        run: make build
       - name: Unit and conformance tests
         run: go test ./...
       - name: Race detector
