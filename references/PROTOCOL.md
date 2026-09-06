@@ -147,7 +147,7 @@ Existing node:
 - omitted properties take type defaults;
 - omitted `parent` MUST keep the current parent;
 - an explicit `parent` equal to the current parent keeps that parent;
-- an explicit different `parent` MAY atomically relocate the surviving node and its complete subtree to that existing container;
+- an explicit different `parent` MUST atomically relocate the surviving node and its complete subtree to that existing container;
 - omitted `index` with an unchanged parent MUST preserve sibling order;
 - omitted `index` after a parent change appends to the target parent's children;
 - explicit `index` reorders the node within the final target parent's children; an out-of-range index appends, matching creation semantics;
