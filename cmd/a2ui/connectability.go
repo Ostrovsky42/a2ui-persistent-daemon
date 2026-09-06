@@ -51,8 +51,8 @@ type codexMCPConfig struct {
 }
 
 type codexMCPGet struct {
-	Name    string `json:"name"`
-	Enabled bool   `json:"enabled"`
+	Name      string `json:"name"`
+	Enabled   bool   `json:"enabled"`
 	Transport struct {
 		Type    string            `json:"type"`
 		Command string            `json:"command"`
