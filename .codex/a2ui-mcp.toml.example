@@ -1,0 +1,10 @@
+# Copy this table into ~/.codex/config.toml after `make install`.
+# If Codex does not inherit a PATH containing ~/.local/bin, replace the command
+# with the absolute path printed by `command -v a2ui-mcp`.
+
+[mcp_servers.a2ui]
+command = "a2ui-mcp"
+env = { A2UI_SERVER = "http://127.0.0.1:8080", A2UI_SESSION = "default" }
+startup_timeout_sec = 10
+tool_timeout_sec = 130
+enabled_tools = ["a2ui_publish", "a2ui_wait_event", "a2ui_status"]
