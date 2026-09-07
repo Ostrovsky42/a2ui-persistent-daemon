@@ -162,6 +162,27 @@ func observeDaemon(ctx context.Context, desired Descriptor, deps ReconcileDepend
 	return daemonObservation{absent: true}, nil
 }
 
+func observeStartedDaemon(ctx context.Context, desired Descriptor, deps ReconcileDependencies) (daemonObservation, error) {
+	socketLive, err := deps.SocketLive(ctx, desired.Socket)
+	if err != nil {
+		return daemonObservation{}, fmt.Errorf("probe started daemon socket: %w", err)
+	}
+	status, statusErr := deps.Status(ctx, desired.Server, desired.Session)
+	if statusErr != nil {
+		if err := ctx.Err(); err != nil {
+			return daemonObservation{}, err
+		}
+		return daemonObservation{}, nil
+	}
+	if err := validateLiveStatus(status, desired); err != nil {
+		return daemonObservation{}, err
+	}
+	if !socketLive {
+		return daemonObservation{}, nil
+	}
+	return daemonObservation{status: status, healthy: true}, nil
+}
+
 func validateLiveStatus(status agentclient.Status, desired Descriptor) error {
 	if status.InstanceID == "" || status.Socket == "" || status.Server == "" || status.Session == "" {
 		return fmt.Errorf("%w: live daemon is missing required runtime identity", ErrDaemonIncompatible)
@@ -180,7 +201,7 @@ func validateLiveStatus(status agentclient.Status, desired Descriptor) error {
 
 func waitForDaemon(ctx context.Context, config ReconcileConfig, deps ReconcileDependencies, wait func(context.Context) error) (daemonObservation, error) {
 	for attempt := 0; attempt < config.MaxReadinessPolls; attempt++ {
-		observation, err := observeDaemon(ctx, config.Desired, deps)
+		observation, err := observeStartedDaemon(ctx, config.Desired, deps)
 		if err != nil {
 			return daemonObservation{}, err
 		}
