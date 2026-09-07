@@ -16,8 +16,6 @@ type agentPublishBatch struct {
 // handleAgentPublishBatch is an ergonomic agent-facing transport boundary. It
 // does not add a V1 mutation or redefine commit: the contained operations are
 // still the six frozen A2UI V1 mutations, applied in their original order.
-// P0.2 initially centralizes renderer signaling here; transaction rollback is
-// hardened separately by the atomic-failure gate.
 func (d *Daemon) handleAgentPublishBatch(msg mcp.Message) (*mcp.Message, *protocol.Error) {
 	var batch agentPublishBatch
 	if perr := wire.StrictUnmarshal(msg.Params, &batch); perr != nil {
@@ -33,27 +31,36 @@ func (d *Daemon) handleAgentPublishBatch(msg mcp.Message) (*mcp.Message, *protoc
 	d.agentMu.Lock()
 	defer d.agentMu.Unlock()
 
-	published := 0
-	for _, op := range batch.Operations {
+	seqs := make([]uint64, len(batch.Operations))
+	for i, op := range batch.Operations {
 		if op.Seq <= 0 {
 			return nil, protocol.NewError("protocol.invalid_sequence", "reliable mutation seq must start at 1")
 		}
-		duplicate, perr := d.Session.AcceptMutation(uint64(op.Seq))
-		if perr != nil {
-			return nil, perr
-		}
-		if duplicate {
-			continue
-		}
-		if perr := d.Engine.Apply(op); perr != nil {
-			return nil, perr
-		}
-		published++
+		seqs[i] = uint64(op.Seq)
+	}
+	plan, perr := d.Session.PrepareMutationBatch(seqs)
+	if perr != nil {
+		return nil, perr
 	}
 
-	// The renderer sees one notification for the complete agent-facing batch.
-	d.signalSnapshot()
-	result, err := json.Marshal(map[string]any{"published": published})
+	toApply := make([]protocol.Operation, 0, len(batch.Operations))
+	for i, op := range batch.Operations {
+		if plan.Apply[i] {
+			toApply = append(toApply, op)
+		}
+	}
+	if perr := d.Engine.ApplyBatch(toApply); perr != nil {
+		return nil, perr
+	}
+	if perr := d.Session.CommitMutationBatch(plan); perr != nil {
+		return nil, perr
+	}
+
+	if len(toApply) > 0 {
+		// One successful agent-facing batch creates at most one renderer update.
+		d.signalSnapshot()
+	}
+	result, err := json.Marshal(map[string]any{"published": len(toApply)})
 	if err != nil {
 		return nil, protocol.NewError("mcp.encode_failed", err.Error())
 	}
