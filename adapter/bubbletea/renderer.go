@@ -62,10 +62,19 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 		availH = 1
 	}
 
+	acknowledgement := fitPlainText(state.Acknowledgement, availW)
 	footer := r.renderContextFooter(doc, focusedID, availW)
 	contentH := availH
+	if acknowledgement != "" {
+		if contentH > 1 {
+			contentH--
+		} else {
+			// Preserve the semantic surface when there is no room for local chrome.
+			acknowledgement = ""
+		}
+	}
 	if footer != "" {
-		if availH > 1 {
+		if contentH > 1 {
 			contentH--
 		} else {
 			// Never hide the entire semantic surface merely to show chrome.
@@ -84,6 +93,12 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 		tables:          result.Tables,
 	}
 	result.Frame = r.renderNode(ctx, "root", availW, contentH)
+	if acknowledgement != "" {
+		if result.Frame != "" {
+			result.Frame += "\n"
+		}
+		result.Frame += acknowledgement
+	}
 	if footer != "" {
 		if result.Frame != "" {
 			result.Frame += "\n"

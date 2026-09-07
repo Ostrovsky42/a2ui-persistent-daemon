@@ -52,7 +52,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	if key != "" {
 		if _, ok := snapshot.Bindings[key]; ok && m.controller != nil {
-			_ = m.controller.ActionKey(key)
+			if err := m.controller.ActionKey(key); err == nil {
+				m.acknowledgeInteraction("✓ Action accepted · Waiting for agent…", snapshot)
+			}
 			return m, nil
 		}
 	}
@@ -110,7 +112,9 @@ func (m *Model) handleInputKey(id, value string, msg tea.KeyMsg) bool {
 		caret++
 		_ = m.controller.SetInput(id, string(next))
 	case tea.KeyEnter:
-		_ = m.controller.Submit(id)
+		if err := m.controller.Submit(id); err == nil {
+			m.acknowledgeInteraction("✓ Submitted: "+SanitizeSingleLineText(value)+" · Waiting for agent…", m.semanticSnapshot())
+		}
 	default:
 		return false
 	}
@@ -160,7 +164,9 @@ func (m *Model) handleTableKey(id string, n document.Node, msg tea.KeyMsg) bool 
 			selectionChanged = true
 		}
 	case tea.KeyEnter:
-		_ = m.controller.ActivateTableSelection(id)
+		if err := m.controller.ActivateTableSelection(id); err == nil {
+			m.acknowledgeInteraction("✓ Selected · Waiting for agent…", m.semanticSnapshot())
+		}
 	default:
 		return false
 	}

@@ -18,12 +18,21 @@ type TableViewportState struct {
 	Offset int
 }
 
+// InteractionAcknowledgement is terminal-local feedback for a semantic
+// boundary that was accepted by the controller. It intentionally has no
+// Document, runtime, or wire representation.
+type InteractionAcknowledgement struct {
+	Message               string
+	PublicationGeneration uint64
+}
+
 // InteractionState owns only adapter-local interaction mechanics. Semantic
 // state such as focus, input values and table selection stays in runtime.State.
 type InteractionState struct {
-	InputCarets    map[string]int
-	Viewports      map[string]ViewportState
-	TableViewports map[string]TableViewportState
+	InputCarets     map[string]int
+	Viewports       map[string]ViewportState
+	TableViewports  map[string]TableViewportState
+	Acknowledgement *InteractionAcknowledgement
 }
 
 func newInteractionState() InteractionState {
@@ -44,6 +53,10 @@ func (s InteractionState) clone() InteractionState {
 	}
 	for id, viewport := range s.TableViewports {
 		out.TableViewports[id] = viewport
+	}
+	if s.Acknowledgement != nil {
+		acknowledgement := *s.Acknowledgement
+		out.Acknowledgement = &acknowledgement
 	}
 	return out
 }

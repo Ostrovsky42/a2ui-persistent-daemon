@@ -84,7 +84,10 @@ func TestUXAcknowledgesSubmitAndDeclaredActionLocally(t *testing.T) {
 	if ev, ok := eng.NextEvent(); !ok || ev.Ev != "submit" || ev.Value != "restart image worker" {
 		t.Fatalf("submit=%+v ok=%v", ev, ok)
 	}
-	if frame := model.View(); !strings.Contains(frame, "Submitted") || !strings.Contains(frame, "Waiting for agent") {
+	if _, ok := eng.NextEvent(); ok {
+		t.Fatal("submit acknowledgement emitted a second semantic event")
+	}
+	if frame := model.View(); !strings.Contains(frame, "Submitted") || !strings.Contains(frame, "restart image worker") || !strings.Contains(frame, "Waiting for agent") {
 		t.Fatalf("submit has no local acknowledgement:\n%s", frame)
 	}
 
@@ -111,7 +114,13 @@ func TestUXAcknowledgesDeclaredActionLocally(t *testing.T) {
 	if ev, ok := eng.NextEvent(); !ok || ev.Ev != "action_result" || ev.Action != "service.retry" {
 		t.Fatalf("action=%+v ok=%v", ev, ok)
 	}
+	if _, ok := eng.NextEvent(); ok {
+		t.Fatal("action acknowledgement emitted a second semantic event")
+	}
 	if frame := model.View(); !strings.Contains(frame, "Waiting for agent") {
 		t.Fatalf("action has no local acknowledgement:\n%s", frame)
+	}
+	if frame := model.View(); !strings.Contains(frame, "Action accepted") {
+		t.Fatalf("action has no local acceptance label:\n%s", frame)
 	}
 }

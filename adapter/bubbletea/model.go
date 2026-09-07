@@ -141,6 +141,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case EngineDirtyMsg:
 		m.reconcileLocalState()
+		m.clearAcknowledgementForPublication(m.semanticSnapshot())
 		anim := m.animationCommandIfNeeded()
 		return m, batchCommands(waitForUpdate(m.updateChan), anim)
 
@@ -183,8 +184,36 @@ func (m Model) renderResultForSnapshot(snapshot engine.PresentationSnapshot) Ren
 		m.interaction,
 		m.Width,
 		m.Height,
-		RenderState{AnimationPhase: m.animationPhase, CursorVisible: m.cursorVisible},
+		RenderState{
+			AnimationPhase:  m.animationPhase,
+			CursorVisible:   m.cursorVisible,
+			Acknowledgement: m.acknowledgementMessage(),
+		},
 	)
+}
+
+func (m *Model) acknowledgeInteraction(message string, snapshot engine.PresentationSnapshot) {
+	m.interaction = m.interaction.clone()
+	m.interaction.Acknowledgement = &InteractionAcknowledgement{
+		Message:               message,
+		PublicationGeneration: snapshot.PublicationGeneration,
+	}
+}
+
+func (m Model) acknowledgementMessage() string {
+	if m.interaction.Acknowledgement == nil {
+		return ""
+	}
+	return m.interaction.Acknowledgement.Message
+}
+
+func (m *Model) clearAcknowledgementForPublication(snapshot engine.PresentationSnapshot) {
+	acknowledgement := m.interaction.Acknowledgement
+	if acknowledgement == nil || snapshot.PublicationGeneration <= acknowledgement.PublicationGeneration {
+		return
+	}
+	m.interaction = m.interaction.clone()
+	m.interaction.Acknowledgement = nil
 }
 
 func (m Model) renderResult() RenderResult {
