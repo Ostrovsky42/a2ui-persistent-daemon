@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrDaemonIncompatible = errors.New("daemon is incompatible with requested local environment")
-	ErrDaemonReadiness    = errors.New("daemon did not become ready")
+	ErrDaemonIncompatible  = errors.New("daemon is incompatible with requested local environment")
+	ErrDaemonReadiness     = errors.New("daemon did not become ready")
 	ErrSupervisorReadiness = errors.New("supervisor did not become ready")
 )
 
