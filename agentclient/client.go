@@ -19,6 +19,49 @@ import (
 
 var ErrAgentStreamConflict = errors.New("agent stream conflict")
 
+type PublishReceipt struct {
+	Published             int    `json:"published"`
+	Frame                 string `json:"frame"`
+	Revision              uint64 `json:"revision"`
+	PublicationGeneration uint64 `json:"publication_generation"`
+	EventCursor           uint64 `json:"event_cursor"`
+	Visible               bool   `json:"visible"`
+}
+
+type WaitRequest struct {
+	AfterSeq   uint64   `json:"after_seq"`
+	Frame      string   `json:"frame,omitempty"`
+	Revision   uint64   `json:"revision,omitempty"`
+	EventTypes []string `json:"event_types,omitempty"`
+	TimeoutMS  int      `json:"timeout_ms,omitempty"`
+}
+type WaitResult struct {
+	MatchedEvents  []protocol.Event `json:"matched_events"`
+	ObservedEvents []protocol.Event `json:"observed_events"`
+	TimedOut       bool             `json:"timed_out"`
+}
+
+func (c *Client) WaitSemanticEvents(ctx context.Context, in WaitRequest) (WaitResult, error) {
+	params, err := json.Marshal(in)
+	if err != nil {
+		return WaitResult{}, err
+	}
+	msg := transportmcp.Message{JSONRPC: "2.0", ID: json.RawMessage(`"wait-agentclient"`), Method: "a2ui/wait_event", Params: params}
+	body, err := c.postMCPBody(ctx, msg)
+	if err != nil {
+		return WaitResult{}, err
+	}
+	var out transportmcp.Message
+	if err := json.Unmarshal(body, &out); err != nil {
+		return WaitResult{}, err
+	}
+	var result WaitResult
+	if err := json.Unmarshal(out.Result, &result); err != nil {
+		return WaitResult{}, fmt.Errorf("decode wait result: %w", err)
+	}
+	return result, nil
+}
+
 type Status struct {
 	Session        string `json:"session"`
 	Revision       uint64 `json:"revision"`
@@ -61,20 +104,18 @@ func New(serverURL, sessionID string, httpClient *http.Client) *Client {
 	return &Client{baseURL: serverURL, sessionID: sessionID, httpClient: httpClient}
 }
 
-func (c *Client) Publish(ctx context.Context, ops []protocol.Operation) error {
+func (c *Client) PublishReceipt(ctx context.Context, ops []protocol.Operation) (PublishReceipt, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
 	if !c.negotiated {
 		if err := c.hello(ctx); err != nil {
-			return err
+			return PublishReceipt{}, err
 		}
 		c.negotiated = true
 	}
 	if len(ops) == 0 {
-		return nil
+		return PublishReceipt{}, nil
 	}
-
 	batch := struct {
 		Session    string               `json:"session"`
 		Operations []protocol.Operation `json:"operations"`
@@ -88,19 +129,28 @@ func (c *Client) Publish(ctx context.Context, ops []protocol.Operation) error {
 	}
 	params, err := json.Marshal(batch)
 	if err != nil {
-		return fmt.Errorf("encode publish batch: %w", err)
+		return PublishReceipt{}, fmt.Errorf("encode publish batch: %w", err)
 	}
-	msg := transportmcp.Message{
-		JSONRPC: "2.0",
-		ID:      json.RawMessage(`"publish-agentclient"`),
-		Method:  "a2ui/publish_batch",
-		Params:  params,
+	msg := transportmcp.Message{JSONRPC: "2.0", ID: json.RawMessage(`"publish-agentclient"`), Method: "a2ui/publish_batch", Params: params}
+	body, err := c.postMCPBody(ctx, msg)
+	if err != nil {
+		return PublishReceipt{}, fmt.Errorf("publish batch: %w", err)
 	}
-	if err := c.postMCP(ctx, msg); err != nil {
-		return fmt.Errorf("publish batch: %w", err)
+	var out transportmcp.Message
+	if err := json.Unmarshal(body, &out); err != nil {
+		return PublishReceipt{}, fmt.Errorf("decode publish response: %w", err)
+	}
+	var receipt PublishReceipt
+	if err := json.Unmarshal(out.Result, &receipt); err != nil {
+		return PublishReceipt{}, fmt.Errorf("decode publish receipt: %w", err)
 	}
 	c.nextSeq += uint64(len(ops))
-	return nil
+	return receipt, nil
+}
+
+func (c *Client) Publish(ctx context.Context, ops []protocol.Operation) error {
+	_, err := c.PublishReceipt(ctx, ops)
+	return err
 }
 
 func (c *Client) hello(ctx context.Context) error {
@@ -132,13 +182,18 @@ func (c *Client) hello(ctx context.Context) error {
 }
 
 func (c *Client) postMCP(ctx context.Context, msg transportmcp.Message) error {
+	_, err := c.postMCPBody(ctx, msg)
+	return err
+}
+
+func (c *Client) postMCPBody(ctx context.Context, msg transportmcp.Message) ([]byte, error) {
 	body, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("encode MCP message: %w", err)
+		return nil, fmt.Errorf("encode MCP message: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("build request: %w", err)
+		return nil, fmt.Errorf("build request: %w", err)
 	}
 	for key, values := range transportmcp.HTTPHeaders(msg) {
 		req.Header[key] = append([]string(nil), values...)
@@ -147,12 +202,12 @@ func (c *Client) postMCP(ctx context.Context, msg transportmcp.Message) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("request: %w", err)
+		return nil, fmt.Errorf("request: %w", err)
 	}
 	defer resp.Body.Close()
 	respBody, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
-		return fmt.Errorf("read response: %w", readErr)
+		return nil, fmt.Errorf("read response: %w", readErr)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		message := strings.TrimSpace(string(respBody))
@@ -160,9 +215,9 @@ func (c *Client) postMCP(ctx context.Context, msg transportmcp.Message) error {
 		if json.Unmarshal(respBody, &rpcErr) == nil && rpcErr.Message != "" {
 			message = rpcErr.Message
 		}
-		return &daemonHTTPError{Status: resp.StatusCode, Message: message}
+		return nil, &daemonHTTPError{Status: resp.StatusCode, Message: message}
 	}
-	return nil
+	return respBody, nil
 }
 
 func (c *Client) WaitEvents(ctx context.Context, timeout time.Duration) ([]protocol.Event, error) {

@@ -50,6 +50,29 @@ func (d *Daemon) signalSnapshot() {
 	}
 }
 
+func (d *Daemon) waitPublication(ctx context.Context, generation uint64) bool {
+	if !d.HasActiveClient() {
+		return false
+	}
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	tick := time.NewTicker(5 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		current, pending := d.Engine.PublicationGeneration()
+		if current == generation && !pending {
+			return true
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-deadline.C:
+			return false
+		case <-tick.C:
+		}
+	}
+}
+
 func (d *Daemon) signalEvents() {
 	select {
 	case d.eventCh <- struct{}{}:

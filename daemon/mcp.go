@@ -23,7 +23,11 @@ func (d *Daemon) HandleMCPMessage(msg mcp.Message) (*mcp.Message, *protocol.Erro
 		if msg.Method == "a2ui/wait_event" {
 			timeout = 30 * time.Second
 			var params struct {
-				TimeoutMs int `json:"timeout_ms"`
+				TimeoutMs  int      `json:"timeout_ms"`
+				AfterSeq   uint64   `json:"after_seq"`
+				Frame      string   `json:"frame"`
+				Revision   uint64   `json:"revision"`
+				EventTypes []string `json:"event_types"`
 			}
 			if len(msg.Params) > 0 {
 				_ = json.Unmarshal(msg.Params, &params)
@@ -31,6 +35,12 @@ func (d *Daemon) HandleMCPMessage(msg mcp.Message) (*mcp.Message, *protocol.Erro
 					timeout = time.Duration(params.TimeoutMs) * time.Millisecond
 				}
 			}
+			result := d.WaitSemanticEvents(context.Background(), timeout, EventWaitRequest{AfterCursor: params.AfterSeq, Frame: params.Frame, Revision: params.Revision, EventTypes: params.EventTypes})
+			resRaw, err := json.Marshal(map[string]any{"matched_events": result.MatchedEvents, "observed_events": result.ObservedEvents, "timed_out": result.TimedOut, "events": result.MatchedEvents})
+			if err != nil {
+				return nil, protocol.NewError("mcp.encode_failed", err.Error())
+			}
+			return &mcp.Message{JSONRPC: "2.0", ID: msg.ID, Result: resRaw}, nil
 		}
 		events := d.WaitEvents(context.Background(), timeout)
 		if events == nil {

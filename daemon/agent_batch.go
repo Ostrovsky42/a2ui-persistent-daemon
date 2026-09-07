@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 
 	"a2ui/protocol"
@@ -56,11 +57,16 @@ func (d *Daemon) handleAgentPublishBatch(msg mcp.Message) (*mcp.Message, *protoc
 		return nil, perr
 	}
 
+	generation, _ := d.Engine.PublicationGeneration()
+	frame, revision, _ := d.Engine.PublicationMetadata(generation)
+	eventCursor := d.Engine.EventCursor()
+	visible := false
 	if len(toApply) > 0 {
 		// One successful agent-facing batch creates at most one renderer update.
 		d.signalSnapshot()
+		visible = d.waitPublication(context.Background(), generation)
 	}
-	result, err := json.Marshal(map[string]any{"published": len(toApply)})
+	result, err := json.Marshal(map[string]any{"published": len(toApply), "frame": frame, "revision": revision, "publication_generation": generation, "event_cursor": eventCursor, "visible": visible})
 	if err != nil {
 		return nil, protocol.NewError("mcp.encode_failed", err.Error())
 	}

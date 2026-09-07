@@ -16,6 +16,8 @@ func (e *Engine) ApplyBatch(ops []protocol.Operation) *protocol.Error {
 	candidateState := e.state.Clone()
 	candidateCommits := append([]commitRequest(nil), e.pendingCommits...)
 	candidatePublicationGeneration := e.publicationGeneration
+	pendingFrame := e.pendingFrame
+	pendingRevision := e.pendingRevision
 
 	for _, op := range ops {
 		beforePublication := candidateState.PublicationGeneration
@@ -32,6 +34,8 @@ func (e *Engine) ApplyBatch(ops []protocol.Operation) *protocol.Error {
 		candidateDoc = next
 		if eff.Commit {
 			candidateCommits = append(candidateCommits, commitRequest{through: uint64(max64(op.Seq, 0)), frame: op.Frame})
+			pendingFrame = op.Frame
+			pendingRevision = candidateDoc.Revision
 		}
 		if candidateState.PublicationGeneration != beforePublication || eff.Commit {
 			candidatePublicationGeneration++
@@ -42,5 +46,7 @@ func (e *Engine) ApplyBatch(ops []protocol.Operation) *protocol.Error {
 	e.state = candidateState
 	e.pendingCommits = candidateCommits
 	e.publicationGeneration = candidatePublicationGeneration
+	e.pendingFrame = pendingFrame
+	e.pendingRevision = pendingRevision
 	return nil
 }

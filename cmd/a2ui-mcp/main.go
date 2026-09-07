@@ -30,12 +30,13 @@ type publishInput struct {
 	Operations []operationInput `json:"operations" jsonschema:"ordered A2UI V1 operations to publish"`
 }
 
-type publishOutput struct {
-	Published int `json:"published"`
-}
+type publishOutput = agentclient.PublishReceipt
 
 type waitEventInput struct {
 	TimeoutMS  int      `json:"timeout_ms,omitempty" jsonschema:"overall wait timeout in milliseconds; default 30000, maximum 120000"`
+	AfterSeq   uint64   `json:"after_seq,omitempty" jsonschema:"enqueue cursor boundary from a2ui_publish receipt"`
+	Frame      string   `json:"frame,omitempty"`
+	Revision   uint64   `json:"revision,omitempty"`
 	EventTypes []string `json:"event_types,omitempty" jsonschema:"optional event type allowlist such as submit or select"`
 }
 
@@ -68,10 +69,11 @@ func newMCPServer(client *agentclient.Client) *mcp.Server {
 			}
 			ops = append(ops, op)
 		}
-		if err := client.Publish(ctx, ops); err != nil {
+		receipt, err := client.PublishReceipt(ctx, ops)
+		if err != nil {
 			return nil, publishOutput{}, err
 		}
-		return nil, publishOutput{Published: len(ops)}, nil
+		return nil, receipt, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -136,39 +138,56 @@ func waitForEvent(ctx context.Context, client *agentclient.Client, input waitEve
 	}
 
 	deadline := time.Now().Add(time.Duration(timeoutMS) * time.Millisecond)
-	out := waitEventOutput{
-		MatchedEvents:  []protocol.Event{},
-		ObservedEvents: []protocol.Event{},
-	}
-
-	for {
-		remaining := time.Until(deadline)
-		if remaining <= 0 {
-			out.TimedOut = true
-			return nil, out, nil
-		}
-		events, err := client.WaitEvents(ctx, remaining)
-		if err != nil {
-			return nil, waitEventOutput{}, err
-		}
-		if len(events) == 0 {
-			out.TimedOut = true
-			return nil, out, nil
-		}
-		out.ObservedEvents = append(out.ObservedEvents, events...)
-		if len(wanted) == 0 {
-			out.MatchedEvents = append(out.MatchedEvents, events...)
-			return nil, out, nil
-		}
-		for _, event := range events {
-			if _, ok := wanted[event.Ev]; ok {
-				out.MatchedEvents = append(out.MatchedEvents, event)
+	if input.AfterSeq == 0 && input.Frame == "" && input.Revision == 0 {
+		observed := []protocol.Event{}
+		for {
+			events, err := client.WaitEvents(ctx, time.Until(deadline))
+			if err != nil {
+				return nil, waitEventOutput{}, err
+			}
+			observed = append(observed, events...)
+			matched := []protocol.Event{}
+			for _, ev := range events {
+				if len(input.EventTypes) == 0 {
+					matched = append(matched, ev)
+					continue
+				}
+				for _, typ := range input.EventTypes {
+					if ev.Ev == typ {
+						matched = append(matched, ev)
+						break
+					}
+				}
+			}
+			if len(matched) > 0 || len(events) == 0 {
+				return nil, waitEventOutput{MatchedEvents: matched, ObservedEvents: observed, TimedOut: len(matched) == 0}, nil
 			}
 		}
-		if len(out.MatchedEvents) > 0 {
-			return nil, out, nil
-		}
 	}
+
+	result, err := client.WaitSemanticEvents(ctx, agentclient.WaitRequest{AfterSeq: input.AfterSeq, Frame: input.Frame, Revision: input.Revision, EventTypes: input.EventTypes, TimeoutMS: int(time.Until(deadline).Milliseconds())})
+	if err != nil {
+		// Compatibility fallback for older daemon bridges; current daemon uses causal waiter above.
+		events, legacyErr := client.WaitEvents(ctx, time.Until(deadline))
+		if legacyErr != nil {
+			return nil, waitEventOutput{}, err
+		}
+		matched := make([]protocol.Event, 0)
+		for _, ev := range events {
+			if len(input.EventTypes) == 0 {
+				matched = append(matched, ev)
+				continue
+			}
+			for _, typ := range input.EventTypes {
+				if ev.Ev == typ {
+					matched = append(matched, ev)
+					break
+				}
+			}
+		}
+		return nil, waitEventOutput{MatchedEvents: matched, ObservedEvents: events, TimedOut: len(matched) == 0}, nil
+	}
+	return nil, waitEventOutput{MatchedEvents: result.MatchedEvents, ObservedEvents: result.ObservedEvents, TimedOut: result.TimedOut}, nil
 }
 
 func envOrDefault(key, fallback string) string {

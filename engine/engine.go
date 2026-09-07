@@ -39,6 +39,8 @@ type Engine struct {
 	maxPendingCommits     int
 	publicationGeneration uint64
 	publishedFrame        string
+	pendingFrame          string
+	pendingRevision       uint64
 }
 
 func New(limits protocol.Limits, eventCapacity int, actions *a2runtime.ActionRegistry) *Engine {
@@ -134,6 +136,8 @@ func (e *Engine) Apply(op protocol.Operation) *protocol.Error {
 	e.doc = next
 	if eff.Commit {
 		e.pendingCommits = append(e.pendingCommits, commitRequest{through: uint64(max64(op.Seq, 0)), frame: op.Frame})
+		e.pendingFrame = op.Frame
+		e.pendingRevision = next.Revision
 	}
 	if e.state.PublicationGeneration != beforePublication || eff.Commit {
 		e.publicationGeneration++
@@ -159,6 +163,18 @@ func (e *Engine) PublicationGeneration() (uint64, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.publicationGeneration, e.needsPublishLocked()
+}
+
+func (e *Engine) PublicationMetadata(generation uint64) (string, uint64, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if generation == 0 || generation != e.publicationGeneration {
+		return "", 0, false
+	}
+	if e.needsPublishLocked() {
+		return e.pendingFrame, e.pendingRevision, true
+	}
+	return e.publishedFrame, e.state.PublishedRevision, true
 }
 
 // EventCursor returns the latest internal enqueue position in the semantic
