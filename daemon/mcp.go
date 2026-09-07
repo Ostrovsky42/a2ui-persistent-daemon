@@ -15,6 +15,9 @@ import (
 // the daemon-owned Session/Engine. It deliberately performs no rendering and
 // never acknowledges publication on behalf of a terminal client.
 func (d *Daemon) HandleMCPMessage(msg mcp.Message) (*mcp.Message, *protocol.Error) {
+	if msg.Method == "a2ui/publish_batch" {
+		return d.handleAgentPublishBatch(msg)
+	}
 	if msg.Method == "a2ui/drain_events" || msg.Method == "a2ui/wait_event" {
 		timeout := 0 * time.Second
 		if msg.Method == "a2ui/wait_event" {
