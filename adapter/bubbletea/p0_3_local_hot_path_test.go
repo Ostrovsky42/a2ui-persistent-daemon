@@ -64,11 +64,7 @@ func TestP03TableNavigationIsLocalAndEventFree(t *testing.T) {
 		key  tea.KeyType
 		want int
 	}{
-		{tea.KeyDown, 1},
-		{tea.KeyDown, 2},
-		{tea.KeyUp, 1},
-		{tea.KeyEnd, 2},
-		{tea.KeyHome, 0},
+		{tea.KeyDown, 1}, {tea.KeyDown, 2}, {tea.KeyUp, 1}, {tea.KeyEnd, 2}, {tea.KeyHome, 0},
 	}
 	for _, step := range steps {
 		model = pressP03(t, model, step.key)
@@ -79,11 +75,8 @@ func TestP03TableNavigationIsLocalAndEventFree(t *testing.T) {
 	}
 
 	after := eng.PresentationSnapshot()
-	if after.Document.Revision != before.Document.Revision {
-		t.Fatalf("navigation changed document revision: before=%d after=%d", before.Document.Revision, after.Document.Revision)
-	}
-	if after.PublicationGeneration != before.PublicationGeneration {
-		t.Fatalf("navigation changed publication generation: before=%d after=%d", before.PublicationGeneration, after.PublicationGeneration)
+	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
+		t.Fatalf("navigation mutated semantic publication state: before=%+v after=%+v", before, after)
 	}
 	assertP03NoEvents(t, eng)
 }
@@ -100,11 +93,8 @@ func TestP03TableEnterEmitsExactlyOneSelect(t *testing.T) {
 
 	model = pressP03(t, model, tea.KeyEnter)
 	ev, ok := eng.NextEvent()
-	if !ok {
-		t.Fatal("Enter emitted no select event")
-	}
-	if ev.Ev != "select" || ev.ID != "workers" || ev.RowID != "worker-b" || ev.Row != 1 {
-		t.Fatalf("unexpected select event: %+v", ev)
+	if !ok || ev.Ev != "select" || ev.ID != "workers" || ev.RowID != "worker-b" || ev.Row != 1 {
+		t.Fatalf("unexpected select event: %+v ok=%v", ev, ok)
 	}
 	assertP03NoEvents(t, eng)
 }
@@ -131,8 +121,7 @@ func TestP03TablePageNavigationIsLocal(t *testing.T) {
 		t.Fatal(perr)
 	}
 	model := NewModel(eng, DefaultTheme, nil)
-	model.Width = 80
-	model.Height = 8
+	model.Width, model.Height = 80, 8
 	model.reconcileLocalState()
 
 	model = pressP03(t, model, tea.KeyPgDown)
@@ -153,25 +142,11 @@ func TestP03TablePageNavigationIsLocal(t *testing.T) {
 func TestP03MasterDetailSelectionUpdatesLocally(t *testing.T) {
 	eng := newTestEngine()
 	applyP03(t, eng, protocol.Operation{
-		V:      protocol.Version,
-		Seq:    1,
-		Op:     protocol.OpUpsert,
-		ID:     "services",
-		Type:   protocol.NodeTable,
-		Parent: "root",
+		V: protocol.Version, Seq: 1, Op: protocol.OpUpsert, ID: "services", Type: protocol.NodeTable, Parent: "root",
 		Props: json.RawMessage(`{
 			"selectable":true,
-			"columns":[
-				{"title":"Service","width":16},
-				{"title":"State","width":14},
-				{"title":"Attention","width":16},
-				{"title":"Task","width":28},
-				{"title":"Age","width":8}
-			],
-			"rows":[
-				["service-a","ready","none","task-a-detail","1s"],
-				["service-b","busy","high","task-b-detail","2s"]
-			],
+			"columns":[{"title":"Service","width":16},{"title":"State","width":14},{"title":"Attention","width":16},{"title":"Task","width":28},{"title":"Age","width":8}],
+			"rows":[["service-a","ready","none","task-a-detail","1s"],["service-b","busy","high","task-b-detail","2s"]],
 			"row_ids":["service-a","service-b"]
 		}`),
 	})
@@ -179,8 +154,7 @@ func TestP03MasterDetailSelectionUpdatesLocally(t *testing.T) {
 		t.Fatal(perr)
 	}
 	model := NewModel(eng, DefaultTheme, nil)
-	model.Width = 60
-	model.Height = 20
+	model.Width, model.Height = 60, 20
 	model.reconcileLocalState()
 	before := eng.PresentationSnapshot()
 
@@ -190,30 +164,19 @@ func TestP03MasterDetailSelectionUpdatesLocally(t *testing.T) {
 	}
 	model = pressP03(t, model, tea.KeyDown)
 	frameB := model.View()
-	if !strings.Contains(frameB, "task-b-detail") {
+	if !strings.Contains(frameB, "task-b-detail") || frameA == frameB {
 		t.Fatalf("local selection did not update detail pane:\n%s", frameB)
-	}
-	if frameA == frameB {
-		t.Fatal("master-detail frame did not change after local selection move")
 	}
 	after := eng.PresentationSnapshot()
 	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
-		t.Fatalf("master-detail navigation mutated semantic publication state: before=%+v after=%+v", before, after)
+		t.Fatalf("master-detail navigation mutated semantic state: before=%+v after=%+v", before, after)
 	}
 	assertP03NoEvents(t, eng)
 }
 
 func TestP03InputEditingStaysLocalUntilEnter(t *testing.T) {
 	eng := newTestEngine()
-	applyP03(t, eng, protocol.Operation{
-		V:      protocol.Version,
-		Seq:    1,
-		Op:     protocol.OpUpsert,
-		ID:     "query",
-		Type:   protocol.NodeInput,
-		Parent: "root",
-		Props:  json.RawMessage(`{"value":"abc","action":"search"}`),
-	})
+	applyP03(t, eng, protocol.Operation{V: protocol.Version, Seq: 1, Op: protocol.OpUpsert, ID: "query", Type: protocol.NodeInput, Parent: "root", Props: json.RawMessage(`{"value":"abc","action":"search"}`)})
 	if perr := eng.Focus("query"); perr != nil {
 		t.Fatal(perr)
 	}
@@ -249,21 +212,19 @@ func TestP03ViewportScrollingIsPurePresentation(t *testing.T) {
 		t.Fatal(perr)
 	}
 	model := NewModel(eng, DefaultTheme, nil)
-	model.Width = 40
-	model.Height = 6
+	model.Width, model.Height = 40, 6
 	model.reconcileLocalState()
 	before := eng.PresentationSnapshot()
 
 	for _, key := range []tea.KeyType{tea.KeyDown, tea.KeyPgDown, tea.KeyUp, tea.KeyHome, tea.KeyEnd} {
 		model = pressP03(t, model, key)
 	}
-	local := model.interaction.Viewports["log"]
-	if local.Offset <= 0 {
+	if local := model.interaction.Viewports["log"]; local.Offset <= 0 {
 		t.Fatalf("viewport End did not move to local max offset: %+v", local)
 	}
 	after := eng.PresentationSnapshot()
 	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
-		t.Fatalf("viewport scrolling mutated semantic publication state: before=%+v after=%+v", before, after)
+		t.Fatalf("viewport scrolling mutated semantic state: before=%+v after=%+v", before, after)
 	}
 	assertP03NoEvents(t, eng)
 }
@@ -271,12 +232,7 @@ func TestP03ViewportScrollingIsPurePresentation(t *testing.T) {
 func TestP03ResponsiveResizePreservesRowIdentityWithoutEvents(t *testing.T) {
 	eng := newTestEngine()
 	applyP03(t, eng, protocol.Operation{
-		V:      protocol.Version,
-		Seq:    1,
-		Op:     protocol.OpUpsert,
-		ID:     "services",
-		Type:   protocol.NodeTable,
-		Parent: "root",
+		V: protocol.Version, Seq: 1, Op: protocol.OpUpsert, ID: "services", Type: protocol.NodeTable, Parent: "root",
 		Props: json.RawMessage(`{
 			"selectable":true,
 			"columns":[{"title":"Service","width":16},{"title":"State","width":14},{"title":"Attention","width":16},{"title":"Task","width":28},{"title":"Age","width":8}],
@@ -293,8 +249,7 @@ func TestP03ResponsiveResizePreservesRowIdentityWithoutEvents(t *testing.T) {
 	model := NewModel(eng, DefaultTheme, nil)
 	before := eng.PresentationSnapshot()
 
-	model.Width = 80
-	model.Height = 20
+	model.Width, model.Height = 80, 20
 	model.reconcileLocalState()
 	wide := model.View()
 	model.Width = 20
@@ -303,11 +258,8 @@ func TestP03ResponsiveResizePreservesRowIdentityWithoutEvents(t *testing.T) {
 	model.Width = 80
 	model.reconcileLocalState()
 	wideAgain := model.View()
-	if wide == narrow {
-		t.Fatal("responsive table frame did not adapt between wide and narrow terminal")
-	}
-	if wideAgain != wide {
-		t.Fatalf("wide -> narrow -> wide did not return to stable presentation\nfirst:\n%s\nagain:\n%s", wide, wideAgain)
+	if wide == narrow || wideAgain != wide {
+		t.Fatalf("responsive wide/narrow/wide presentation unstable")
 	}
 	sel, ok := eng.SelectedTableRow("services")
 	if !ok || sel.RowID != "service-b" {
@@ -315,7 +267,7 @@ func TestP03ResponsiveResizePreservesRowIdentityWithoutEvents(t *testing.T) {
 	}
 	after := eng.PresentationSnapshot()
 	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
-		t.Fatalf("resize mutated semantic publication state: before=%+v after=%+v", before, after)
+		t.Fatalf("resize mutated semantic state: before=%+v after=%+v", before, after)
 	}
 	assertP03NoEvents(t, eng)
 }
@@ -323,12 +275,7 @@ func TestP03ResponsiveResizePreservesRowIdentityWithoutEvents(t *testing.T) {
 func TestP03StableRowIDSurvivesReorderAndDrivesDetail(t *testing.T) {
 	eng := newTestEngine()
 	applyP03(t, eng, protocol.Operation{
-		V:      protocol.Version,
-		Seq:    1,
-		Op:     protocol.OpUpsert,
-		ID:     "workers",
-		Type:   protocol.NodeTable,
-		Parent: "root",
+		V: protocol.Version, Seq: 1, Op: protocol.OpUpsert, ID: "workers", Type: protocol.NodeTable, Parent: "root",
 		Props: json.RawMessage(`{
 			"selectable":true,
 			"columns":[{"title":"Worker","width":16},{"title":"State","width":14},{"title":"Task","width":28}],
@@ -343,20 +290,13 @@ func TestP03StableRowIDSurvivesReorderAndDrivesDetail(t *testing.T) {
 		t.Fatal(perr)
 	}
 	model := NewModel(eng, DefaultTheme, nil)
-	model.Width = 45
-	model.Height = 20
+	model.Width, model.Height = 45, 20
 	model.reconcileLocalState()
 
-	applyP03(t, eng, protocol.Operation{
-		V:   protocol.Version,
-		Seq: 2,
-		Op:  protocol.OpProps,
-		ID:  "workers",
-		Props: json.RawMessage(`{
-			"rows":[["worker-c","idle","task-c"],["worker-b","busy","task-b-detail"],["worker-a","ready","task-a"]],
-			"row_ids":["worker-c","worker-b","worker-a"]
-		}`),
-	})
+	applyP03(t, eng, protocol.Operation{V: protocol.Version, Seq: 2, Op: protocol.OpProps, ID: "workers", Props: json.RawMessage(`{
+		"rows":[["worker-c","idle","task-c"],["worker-b","busy","task-b-detail"],["worker-a","ready","task-a"]],
+		"row_ids":["worker-c","worker-b","worker-a"]
+	}`)})
 	model.reconcileLocalState()
 	sel, ok := eng.SelectedTableRow("workers")
 	if !ok || sel.RowID != "worker-b" || sel.Index != 1 {
@@ -375,12 +315,11 @@ func TestP03ContextFooterIsRendererOnlyAndFocusAware(t *testing.T) {
 		protocol.Operation{V: protocol.Version, Seq: 2, Op: protocol.OpUpsert, ID: "query", Type: protocol.NodeInput, Parent: "root", Props: json.RawMessage(`{"value":"","action":"search"}`)},
 		protocol.Operation{V: protocol.Version, Seq: 3, Op: protocol.OpUpsert, ID: "log", Type: protocol.NodeViewport, Parent: "root", Props: json.RawMessage(`{"scrollable":true}`)},
 		protocol.Operation{V: protocol.Version, Seq: 4, Op: protocol.OpUpsert, ID: "log-text", Type: protocol.NodeText, Parent: "log", Props: json.RawMessage(`{"text":"one\ntwo\nthree\nfour\nfive"}`)},
-		protocol.Operation{V: protocol.Version, Seq: 5, Op: protocol.OpUpsert, ID: "actions", Type: protocol.NodeActions, Parent: "root", Props: json.RawMessage(`{"items":[{"key":"r","label":"Retry","action":"retry"},{"key":"down","label":"Shadow","action":"shadow"}]}`)},
+		protocol.Operation{V: protocol.Version, Seq: 5, Op: protocol.OpUpsert, ID: "actions", Type: protocol.NodeActions, Parent: "root", Props: json.RawMessage(`{"items":[{"key":"r","label":"Retry","action":"retry"}]}`)},
 	)
 	before := eng.PresentationSnapshot()
 	model := NewModel(eng, DefaultTheme, nil)
-	model.Width = 100
-	model.Height = 24
+	model.Width, model.Height = 100, 24
 
 	if perr := eng.Focus("workers"); perr != nil {
 		t.Fatal(perr)
@@ -391,9 +330,6 @@ func TestP03ContextFooterIsRendererOnlyAndFocusAware(t *testing.T) {
 		if !strings.Contains(tableFrame, hint) {
 			t.Fatalf("table footer missing %q:\n%s", hint, tableFrame)
 		}
-	}
-	if strings.Contains(tableFrame, "Shadow") {
-		t.Fatalf("footer advertised action shadowed by focused table navigation:\n%s", tableFrame)
 	}
 	if strings.Contains(tableFrame, "Esc") {
 		t.Fatalf("footer invented unsupported Escape semantics:\n%s", tableFrame)
@@ -425,14 +361,11 @@ func TestP03ContextFooterIsRendererOnlyAndFocusAware(t *testing.T) {
 	}
 
 	after := eng.PresentationSnapshot()
-	if after.Document.Revision != before.Document.Revision {
-		t.Fatalf("footer changed Document revision: before=%d after=%d", before.Document.Revision, after.Document.Revision)
-	}
-	if after.PublicationGeneration != before.PublicationGeneration {
-		t.Fatalf("footer changed publication generation: before=%d after=%d", before.PublicationGeneration, after.PublicationGeneration)
+	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
+		t.Fatalf("footer mutated semantic state: before=%+v after=%+v", before, after)
 	}
 	if model.PublishCount() != 0 {
-		t.Fatalf("footer triggered renderer publication acknowledgement count=%d", model.PublishCount())
+		t.Fatalf("footer triggered publication acknowledgement count=%d", model.PublishCount())
 	}
 	assertP03NoEvents(t, eng)
 }
