@@ -127,6 +127,20 @@ func (m *Model) handleTableKey(id string, n document.Node, msg tea.KeyMsg) bool 
 	case tea.KeyDown:
 		_ = m.controller.MoveTableSelection(id, 1)
 		selectionChanged = true
+	case tea.KeyPgUp, tea.KeyPgDown:
+		metrics, ok := m.renderResult().Tables[id]
+		if !ok {
+			return false
+		}
+		page := metrics.VisibleRows - 1
+		if page < 1 {
+			page = 1
+		}
+		if msg.Type == tea.KeyPgUp {
+			page = -page
+		}
+		_ = m.controller.MoveTableSelection(id, page)
+		selectionChanged = true
 	case tea.KeyHome:
 		snapshot := m.semanticSnapshot()
 		if selection, ok := snapshot.TableSelections[id]; ok {
