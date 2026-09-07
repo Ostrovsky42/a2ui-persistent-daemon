@@ -39,7 +39,7 @@ type ControllerConfig struct {
 }
 
 type State struct {
-	LastObservedGeneration uint64
+	LastObservedGeneration  uint64
 	LaunchPending           bool
 	LaunchGeneration        uint64
 	FailedThroughGeneration uint64
