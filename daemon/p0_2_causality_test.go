@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"a2ui/ipc"
 	"a2ui/protocol"
@@ -65,11 +66,44 @@ func TestP02UnreadSelectFromPreviousFrameDoesNotSatisfyNewScreenWait(t *testing.
 	if perr := d.Engine.Publish(); perr != nil {
 		t.Fatal(perr)
 	}
+	boundary := d.Engine.EventCursor()
+	revision := d.Engine.Document().Revision
 
-	events := d.WaitEvents(context.Background(), 0)
-	for _, ev := range events {
+	resultCh := make(chan EventWaitResult, 1)
+	go func() {
+		resultCh <- d.WaitSemanticEvents(context.Background(), time.Second, EventWaitRequest{
+			AfterCursor: boundary,
+			Frame:       "workers-B",
+			Revision:    revision,
+			EventTypes:  []string{"select"},
+		})
+	}()
+
+	// Give the waiter a chance to observe the unread frame-A event before the
+	// causally valid frame-B interaction arrives.
+	time.Sleep(10 * time.Millisecond)
+	if ierr := d.handleInteraction(context.Background(), &interaction); ierr != nil {
+		t.Fatal(ierr)
+	}
+	d.signalEvents()
+
+	result := <-resultCh
+	if result.TimedOut {
+		t.Fatal("causal wait timed out")
+	}
+	if len(result.MatchedEvents) != 1 || result.MatchedEvents[0].RowID != "api-worker" || result.MatchedEvents[0].Frame != "workers-B" {
+		t.Fatalf("matched events = %+v, want only api-worker from workers-B", result.MatchedEvents)
+	}
+	staleObserved := false
+	for _, ev := range result.ObservedEvents {
 		if ev.Ev == "select" && ev.RowID == "image-worker" {
-			t.Fatalf("stale select from frame A satisfied the post-frame-B wait: %+v", ev)
+			staleObserved = true
+			if ev.Frame != "workers-A" {
+				t.Fatalf("stale event attribution = %+v, want workers-A", ev)
+			}
 		}
+	}
+	if !staleObserved {
+		t.Fatalf("old reliable event disappeared from observed history: %+v", result.ObservedEvents)
 	}
 }
