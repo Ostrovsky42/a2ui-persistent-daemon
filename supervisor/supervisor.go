@@ -12,6 +12,8 @@ import (
 var (
 	ErrDaemonReplaced         = errors.New("daemon instance replaced")
 	ErrDaemonIdentityMismatch = errors.New("daemon identity mismatch")
+	ErrViewerLaunchFailed     = errors.New("viewer launch failed")
+	ErrViewerAttachTimeout    = errors.New("viewer attach timeout")
 )
 
 type Identity struct {
@@ -79,7 +81,7 @@ func (c *Controller) Observe(ctx context.Context, status agentclient.Status, now
 		c.initialized = true
 		c.state.LastObservedGeneration = status.Generation
 		if c.shouldLaunch(status, true) {
-			c.requestLaunch(ctx, status.Generation, now)
+			return c.requestLaunch(ctx, status.Generation, now)
 		}
 		return nil
 	}
@@ -98,7 +100,9 @@ func (c *Controller) Observe(ctx context.Context, status agentclient.Status, now
 			return nil
 		}
 		if !c.attachDeadline.IsZero() && !now.Before(c.attachDeadline) {
-			c.failThrough(status.Generation, "viewer attach timeout")
+			generation := status.Generation
+			c.failThrough(generation, ErrViewerAttachTimeout.Error())
+			return fmt.Errorf("%w: generation %d", ErrViewerAttachTimeout, generation)
 		}
 		return nil
 	}
@@ -107,7 +111,7 @@ func (c *Controller) Observe(ctx context.Context, status agentclient.Status, now
 		return nil
 	}
 	if c.shouldLaunch(status, false) {
-		c.requestLaunch(ctx, status.Generation, now)
+		return c.requestLaunch(ctx, status.Generation, now)
 	}
 	return nil
 }
@@ -148,14 +152,16 @@ func (c *Controller) shouldLaunch(status agentclient.Status, bootstrap bool) boo
 	return c.config.LaunchAllowed()
 }
 
-func (c *Controller) requestLaunch(ctx context.Context, generation uint64, now time.Time) {
+func (c *Controller) requestLaunch(ctx context.Context, generation uint64, now time.Time) error {
 	c.state.LaunchPending = true
 	c.state.LaunchGeneration = generation
 	c.attachDeadline = now.Add(c.config.AttachTimeout)
 
 	if err := c.config.Launcher.LaunchViewer(ctx, c.config.Viewer); err != nil {
 		c.failThrough(generation, err.Error())
+		return fmt.Errorf("%w: generation %d: %v", ErrViewerLaunchFailed, generation, err)
 	}
+	return nil
 }
 
 func (c *Controller) failThrough(generation uint64, message string) {
