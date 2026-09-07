@@ -69,6 +69,9 @@ type Status struct {
 	HasClient      bool   `json:"has_client"`
 	Generation     uint64 `json:"generation"`
 	PendingPublish bool   `json:"pending_publish"`
+	InstanceID     string `json:"instance_id"`
+	Socket         string `json:"socket"`
+	Server         string `json:"server"`
 }
 
 type daemonHTTPError struct {
