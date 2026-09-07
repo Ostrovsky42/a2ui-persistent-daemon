@@ -54,12 +54,15 @@ func TestRendererHonorsLocalTableViewportOffset(t *testing.T) {
 		RenderState{CursorVisible: true},
 	)
 
-	for _, visible := range []string{"row-10", "row-11", "row-12", "row-13"} {
+	// The local footer consumes one of the six terminal rows. The reconciler
+	// shifts the requested window just enough to keep the semantic selection
+	// visible inside the remaining three data rows.
+	for _, visible := range []string{"row-11", "row-12", "row-13"} {
 		if !strings.Contains(result.Frame, visible) {
 			t.Fatalf("expected %q in preserved local window:\n%s", visible, result.Frame)
 		}
 	}
-	for _, hidden := range []string{"row-09", "row-14"} {
+	for _, hidden := range []string{"row-10", "row-14"} {
 		if strings.Contains(result.Frame, hidden) {
 			t.Fatalf("unexpected %q outside preserved local window:\n%s", hidden, result.Frame)
 		}
@@ -69,7 +72,7 @@ func TestRendererHonorsLocalTableViewportOffset(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected table viewport metrics, got %#v", result.Tables)
 	}
-	if metrics.TotalRows != 20 || metrics.VisibleRows != 4 || metrics.MaxOffset != 16 || metrics.Offset != 10 {
+	if metrics.TotalRows != 20 || metrics.VisibleRows != 3 || metrics.MaxOffset != 17 || metrics.Offset != 11 {
 		t.Fatalf("unexpected table metrics: %#v", metrics)
 	}
 }
