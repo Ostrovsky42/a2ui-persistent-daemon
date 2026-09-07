@@ -69,6 +69,24 @@ func TestPublishToolUsesPersistentA2UIAuthority(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if msg.Method == "a2ui/publish_batch" {
+			var batch struct {
+				Operations []protocol.Operation `json:"operations"`
+			}
+			if err := json.Unmarshal(msg.Params, &batch); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			mu.Lock()
+			for _, op := range batch.Operations {
+				sequences = append(sequences, uint64(op.Seq))
+				operations = append(operations, op)
+			}
+			mu.Unlock()
+			result, _ := json.Marshal(map[string]any{"published": len(batch.Operations)})
+			_ = json.NewEncoder(w).Encode(transportmcp.Message{JSONRPC: "2.0", ID: msg.ID, Result: result})
+			return
+		}
 		env, perr := transportmcp.EnvelopeFromMessage(msg)
 		if perr != nil {
 			http.Error(w, perr.Message, http.StatusBadRequest)
@@ -80,15 +98,6 @@ func TestPublishToolUsesPersistentA2UIAuthority(t *testing.T) {
 		case protocol.KindHello:
 			helloCount++
 			w.WriteHeader(http.StatusOK)
-		case protocol.KindOperation:
-			var op protocol.Operation
-			if err := json.Unmarshal(env.Payload, &op); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			sequences = append(sequences, env.Seq)
-			operations = append(operations, op)
-			w.WriteHeader(http.StatusNoContent)
 		default:
 			http.Error(w, "unexpected envelope", http.StatusBadRequest)
 		}
@@ -269,7 +278,7 @@ func TestStatusToolReturnsExistingDaemonStatus(t *testing.T) {
 	}
 	var status agentclient.Status
 	if err := json.Unmarshal(raw, &status); err != nil {
-		t.Fatalf("decode status output: %v", err)
+		t.Fatalf("decode structured content: %v", err)
 	}
 	if status.Session != "p0" || status.Revision != 12 || status.Nodes != 4 || !status.HasClient || status.Generation != 9 || status.PendingPublish {
 		t.Fatalf("status = %#v, want decoded daemon status", status)
