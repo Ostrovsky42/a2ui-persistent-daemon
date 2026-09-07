@@ -299,5 +299,5 @@ func isCodexMCPNotFound(err error) bool {
 		return false
 	}
 	text := strings.ToLower(err.Error())
-	return strings.Contains(text, "no mcp server named") || strings.Contains(text, "not found")
+	return strings.Contains(text, "no mcp server named 'a2ui' found")
 }
