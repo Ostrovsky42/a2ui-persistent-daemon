@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"a2ui/ipc"
 	"a2ui/protocol"
 )
 
@@ -50,7 +51,8 @@ func TestP02UnreadSelectFromPreviousFrameDoesNotSatisfyNewScreenWait(t *testing.
 		t.Fatalf("frame A publication event = %+v, ok=%v", ev, ok)
 	}
 
-	if ierr := d.handleInteraction(context.Background(), &structSelectInteraction); ierr != nil {
+	interaction := ipc.Interaction{Type: ipc.InteractionTableActivate, ID: "workers"}
+	if ierr := d.handleInteraction(context.Background(), &interaction); ierr != nil {
 		t.Fatal(ierr)
 	}
 
