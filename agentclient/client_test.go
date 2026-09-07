@@ -34,6 +34,22 @@ func TestPublishNegotiatesOnceAndContinuesSequenceAcrossCalls(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if msg.Method == "a2ui/publish_batch" {
+			var batch struct {
+				Operations []protocol.Operation `json:"operations"`
+			}
+			if err := json.Unmarshal(msg.Params, &batch); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			mu.Lock()
+			for _, op := range batch.Operations {
+				sequences = append(sequences, uint64(op.Seq))
+			}
+			mu.Unlock()
+			_ = json.NewEncoder(w).Encode(transportmcp.Message{JSONRPC: "2.0", ID: msg.ID, Result: json.RawMessage(`{"published":2}`)})
+			return
+		}
 		env, perr := transportmcp.EnvelopeFromMessage(msg)
 		if perr != nil {
 			http.Error(w, perr.Message, http.StatusBadRequest)
@@ -45,9 +61,6 @@ func TestPublishNegotiatesOnceAndContinuesSequenceAcrossCalls(t *testing.T) {
 		case protocol.KindHello:
 			helloCount++
 			w.WriteHeader(http.StatusOK)
-		case protocol.KindOperation:
-			sequences = append(sequences, env.Seq)
-			w.WriteHeader(http.StatusNoContent)
 		default:
 			http.Error(w, "unexpected envelope kind", http.StatusBadRequest)
 		}
