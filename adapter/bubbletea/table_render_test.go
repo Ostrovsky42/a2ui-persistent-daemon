@@ -128,15 +128,20 @@ func TestRendererBoundsVisibleTableRowsByTerminalHeight(t *testing.T) {
 	r := NewRendererWithPreset(DefaultTheme, PresetMinimal)
 	frame := r.RenderTree(eng.Document(), "agents", eng.InputValues(), map[string]int{"agents": 0}, 80, 6)
 
-	for _, visible := range []string{"row-00", "row-01", "row-02", "row-03"} {
+	// The focus-aware footer is renderer chrome and owns one terminal row. The
+	// semantic table must remain bounded inside the remaining five rows.
+	for _, visible := range []string{"row-00", "row-01", "row-02"} {
 		if !strings.Contains(frame, visible) {
 			t.Fatalf("expected %q in bounded table frame:\n%s", visible, frame)
 		}
 	}
-	for _, hidden := range []string{"row-04", "row-05", "row-09"} {
+	for _, hidden := range []string{"row-03", "row-04", "row-09"} {
 		if strings.Contains(frame, hidden) {
 			t.Fatalf("row %q leaked outside visible height window:\n%s", hidden, frame)
 		}
+	}
+	if !strings.Contains(frame, "Enter Select") {
+		t.Fatalf("focused table frame is missing local context footer:\n%s", frame)
 	}
 }
 
