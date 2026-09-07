@@ -82,7 +82,7 @@ func TestProcessViewerLauncherHonorsDiscoveryOrder(t *testing.T) {
 	marker := filepath.Join(dir, "terminal-name.txt")
 	for _, terminal := range []string{"xdg-terminal-exec", "gnome-terminal", "kitty", "alacritty", "konsole"} {
 		path := filepath.Join(dir, terminal)
-		script := "#!/bin/sh\nprintf '%s\\n' \"$(basename \"$0\")\" > \"$A2UI_TEST_MARKER\"\n"
+		script := "#!/bin/sh\nname=${0##*/}\nprintf '%s\\n' \"$name\" > \"$A2UI_TEST_MARKER\"\n"
 		if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
 			t.Fatalf("write fake terminal %s: %v", terminal, err)
 		}
