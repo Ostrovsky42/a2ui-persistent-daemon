@@ -79,11 +79,11 @@ func (c *Client) Publish(ctx context.Context, ops []protocol.Operation) error {
 		Session    string               `json:"session"`
 		Operations []protocol.Operation `json:"operations"`
 	}{Session: c.sessionID, Operations: make([]protocol.Operation, 0, len(ops))}
-	for _, input := range ops {
-		c.nextSeq++
+	startSeq := c.nextSeq
+	for i, input := range ops {
 		op := input
 		op.V = protocol.Version
-		op.Seq = int64(c.nextSeq)
+		op.Seq = int64(startSeq + uint64(i) + 1)
 		batch.Operations = append(batch.Operations, op)
 	}
 	params, err := json.Marshal(batch)
@@ -99,6 +99,7 @@ func (c *Client) Publish(ctx context.Context, ops []protocol.Operation) error {
 	if err := c.postMCP(ctx, msg); err != nil {
 		return fmt.Errorf("publish batch: %w", err)
 	}
+	c.nextSeq += uint64(len(ops))
 	return nil
 }
 
