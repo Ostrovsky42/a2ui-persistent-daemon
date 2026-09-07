@@ -166,7 +166,6 @@ func (d *Daemon) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (d *Daemon) serveStatus(w http.ResponseWriter, req *http.Request) {
 	doc := d.Engine.Document()
 	curGen, pending := d.Engine.PublicationGeneration()
-	runtime := d.RuntimeIdentity()
 	status := map[string]any{
 		"session":         d.Session.ID(),
 		"revision":        doc.Revision,
@@ -174,9 +173,6 @@ func (d *Daemon) serveStatus(w http.ResponseWriter, req *http.Request) {
 		"has_client":      d.HasActiveClient(),
 		"generation":      curGen,
 		"pending_publish": pending,
-		"instance_id":     runtime.InstanceID,
-		"socket":          runtime.Socket,
-		"server":          runtime.Server,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
