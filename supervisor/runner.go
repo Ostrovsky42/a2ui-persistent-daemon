@@ -3,6 +3,7 @@ package supervisor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"a2ui/agentclient"
@@ -23,16 +24,53 @@ type PollerConfig struct {
 }
 
 type Poller struct {
-	config PollerConfig
+	config              PollerConfig
+	consecutiveFailures int
 }
 
 func NewPoller(config PollerConfig) (*Poller, error) {
 	if config.Source == nil || config.Controller == nil {
 		return nil, errors.New("status source and controller are required")
 	}
+	if config.MaxStatusFailures <= 0 {
+		config.MaxStatusFailures = 3
+	}
 	return &Poller{config: config}, nil
 }
 
-func (p *Poller) Poll(context.Context, time.Time) error {
-	return nil
+func (p *Poller) Poll(ctx context.Context, now time.Time) error {
+	requestCtx, cancel := context.WithTimeout(ctx, PollInterval)
+	defer cancel()
+
+	status, err := p.config.Source.Status(requestCtx)
+	if err != nil {
+		p.consecutiveFailures++
+		if p.consecutiveFailures >= p.config.MaxStatusFailures {
+			return fmt.Errorf("%w after %d consecutive failures: %v", ErrStatusUnavailable, p.consecutiveFailures, err)
+		}
+		return nil
+	}
+
+	p.consecutiveFailures = 0
+	return p.config.Controller.Observe(ctx, status, now)
+}
+
+func (p *Poller) Run(ctx context.Context) error {
+	if err := p.Poll(ctx, time.Now()); err != nil {
+		return err
+	}
+
+	ticker := time.NewTicker(PollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case now := <-ticker.C:
+			if err := p.Poll(ctx, now); err != nil {
+				return err
+			}
+		}
+	}
 }
