@@ -61,6 +61,18 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 	if availH < 1 {
 		availH = 1
 	}
+
+	footer := r.renderContextFooter(doc, focusedID, availW)
+	contentH := availH
+	if footer != "" {
+		if availH > 1 {
+			contentH--
+		} else {
+			// Never hide the entire semantic surface merely to show chrome.
+			footer = ""
+		}
+	}
+
 	ctx := renderContext{
 		doc:             doc,
 		focusedID:       focusedID,
@@ -71,7 +83,13 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 		viewports:       result.Viewports,
 		tables:          result.Tables,
 	}
-	result.Frame = r.renderNode(ctx, "root", availW, availH)
+	result.Frame = r.renderNode(ctx, "root", availW, contentH)
+	if footer != "" {
+		if result.Frame != "" {
+			result.Frame += "\n"
+		}
+		result.Frame += footer
+	}
 	return result
 }
 
