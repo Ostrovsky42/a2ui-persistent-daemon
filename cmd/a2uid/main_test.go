@@ -116,7 +116,7 @@ func stopA2uidHelper(t *testing.T, cmd *exec.Cmd) {
 	if cmd == nil || cmd.Process == nil {
 		return
 	}
-	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil && !os.IsProcessDone(err) {
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
 		t.Fatalf("signal a2uid helper: %v", err)
 	}
 	if err := cmd.Wait(); err != nil {
