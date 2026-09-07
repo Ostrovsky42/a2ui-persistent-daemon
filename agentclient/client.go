@@ -71,31 +71,33 @@ func (c *Client) Publish(ctx context.Context, ops []protocol.Operation) error {
 		}
 		c.negotiated = true
 	}
+	if len(ops) == 0 {
+		return nil
+	}
 
+	batch := struct {
+		Session    string               `json:"session"`
+		Operations []protocol.Operation `json:"operations"`
+	}{Session: c.sessionID, Operations: make([]protocol.Operation, 0, len(ops))}
 	for _, input := range ops {
 		c.nextSeq++
-		seq := c.nextSeq
 		op := input
 		op.V = protocol.Version
-		op.Seq = int64(seq)
-		payload, err := json.Marshal(op)
-		if err != nil {
-			return fmt.Errorf("encode operation %d: %w", seq, err)
-		}
-		env := protocol.Envelope{
-			V:       protocol.Version,
-			Session: c.sessionID,
-			Kind:    protocol.KindOperation,
-			Seq:     seq,
-			Payload: payload,
-		}
-		msg, err := transportmcp.Notification(env)
-		if err != nil {
-			return fmt.Errorf("build operation %d: %w", seq, err)
-		}
-		if err := c.postMCP(ctx, msg); err != nil {
-			return fmt.Errorf("publish operation %d: %w", seq, err)
-		}
+		op.Seq = int64(c.nextSeq)
+		batch.Operations = append(batch.Operations, op)
+	}
+	params, err := json.Marshal(batch)
+	if err != nil {
+		return fmt.Errorf("encode publish batch: %w", err)
+	}
+	msg := transportmcp.Message{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage(`"publish-agentclient"`),
+		Method:  "a2ui/publish_batch",
+		Params:  params,
+	}
+	if err := c.postMCP(ctx, msg); err != nil {
+		return fmt.Errorf("publish batch: %w", err)
 	}
 	return nil
 }
