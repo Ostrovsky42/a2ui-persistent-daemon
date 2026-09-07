@@ -6,7 +6,7 @@ Authoritative branch: `feature/20260907-a2ui-up-local-supervisor`
 
 Inspected base: `96d54e40f6dae4e15aa7a932040d0b86cb1c12ef` (`feat(ux): show committed interaction while waiting`)
 
-Status: design checkpoint only. Production supervisor, terminal launching, `a2ui up`, Omarchy integration, systemd/autostart, and A2UI protocol changes are not implemented by this checkpoint.
+Document role: approved implementation design. Mutable execution status and verification evidence belong to the paired implementation plan and CI, not to a prose `Status:` claim in this design document.
 
 ## 1. Goal and non-goals
 
@@ -103,7 +103,7 @@ Cons:
 - small steady-state local HTTP load;
 - daemon loss is detected on the next poll rather than pushed immediately.
 
-Decision: recommend this for the first version. Use a fixed 250 ms local interval and bounded request timeout; no busy loop. The interval is an implementation constant, not a public semantic setting.
+Decision: recommend this for the first version. Use a fixed 250 ms local polling interval and an independent 2 second request timeout; no busy loop. Poll cadence, individual request budget, and consecutive-failure grace are separate lifecycle parameters. The interval is an implementation constant, not a public semantic setting.
 
 ### Option C — hybrid wake + status read
 
@@ -183,6 +183,7 @@ Both background processes are independent after `up` returns. On Unix, the start
 Recovery ownership stays simple:
 
 - supervisor dead, daemon healthy -> next `a2ui up` starts only supervisor;
+- viewer launch fails or the launched viewer does not acquire the lease before its attach deadline -> supervisor records the failure and exits nonzero, releasing `supervisor.lock`; the pending publication remains daemon-owned, and the next `a2ui up` may start a fresh supervisor whose bootstrap performs one fresh attempt for that same still-pending generation;
 - daemon dead/replaced -> bound supervisor detects status/instance loss, records a diagnostic, and exits after a short bounded failure grace; it never fabricates health or starts a new daemon;
 - next `a2ui up` is the repair/reconciliation entrypoint.
 
@@ -311,6 +312,8 @@ Set `launch_pending=true` before invoking the launcher. Store the triggering gen
 
 The preferred and authoritative success fact is `has_client=true`, meaning the existing daemon lease was acquired. Only then is the attempt considered attached and `launch_pending` cleared as success.
 
+`has_client` intentionally proves lease acquisition, not desktop visibility. Human-visible attachment is guaranteed by the host-launcher boundary: automatic viewer launch must go through a supported terminal emulator rather than start the Bubble Tea process detached with `/dev/null` and a log file as its terminal.
+
 ### Failure before attachment
 
 Two failure facts are supported:
@@ -318,7 +321,9 @@ Two failure facts are supported:
 1. the host launcher returns an immediate start error; or
 2. the attach deadline expires and authoritative status still reports no client.
 
-Before clearing a failed pending attempt, perform/read the latest status and set `failed_through_generation` to at least that current generation. This suppresses both the triggering generation and any rapid generations that arrived while the failed launch was pending. The same semantic generation is never retried in a poll loop. A genuinely later publication (`generation > failed_through_generation`) may make one new attempt.
+Before ending a failed pending attempt, use the latest observed status and set `failed_through_generation` to at least that current generation. This suppresses the triggering generation and any rapid generations that arrived while the launch was pending for the remainder of this supervisor lifetime. The same supervisor process never retries that semantic generation in its poll loop.
+
+A failed launch or attach is also a lifecycle-fatal supervisor condition. Return the failure to the poller, log it, and exit nonzero so `supervisor.lock` is released. The daemon and pending publication remain alive. The next explicit `a2ui up` repair starts a fresh supervisor; bootstrap may then make one new launch attempt for the same still-pending generation. This makes recovery explicit without introducing a retry loop, a control API for resetting `failed_through_generation`, or supervisor-owned semantic state.
 
 Retain a concise local diagnostic in the supervisor log. Do not emit a semantic A2UI event for host launch failure.
 
@@ -360,9 +365,9 @@ The first Linux backend discovery order is:
 4. `alacritty`;
 5. `konsole`.
 
-Each emulator's argv differences remain isolated behind the launcher backend. The supervisor core never knows emulator names, focus APIs, workspaces, or geometry.
+Each emulator's argv differences remain isolated behind the launcher backend. `xdg-terminal-exec` and `gnome-terminal` receive the viewer after `--`; Kitty receives the viewer program directly; Alacritty and Konsole receive it after `-e`. The supervisor core never knows emulator names, focus APIs, workspaces, or geometry.
 
-Current execution-environment characterization found none of those terminal binaries. It also reports `CI=true` while `DISPLAY=:0`, which is useful evidence that CI detection must override a superficial display variable. Real launcher argv/desktop acceptance therefore belongs to the later manual host phase, not CI.
+Current execution-environment characterization found none of those terminal binaries. It also reports `CI=true` while `DISPLAY=:0`, which is useful evidence that CI detection must override a superficial display variable. Real desktop-window acceptance therefore belongs to the later manual host phase; CI verifies discovery order and argv construction with hermetic fake terminal executables rather than opening real windows.
 
 ## 12. Headless, SSH, CI, and explicit policy
 
@@ -430,15 +435,15 @@ Pending launch + authoritative `has_client=true` -> pending clears as success.
 
 Attach -> detach with same generation -> no launch. Later new pending generation -> exactly one new launch.
 
-### RED 7 — launch failure
+### RED 7 — launch failure and repair
 
-Immediate launcher error or attach timeout -> pending clears, local diagnostic retained, no repeated call for the same or coalesced-through generation. A later generation may produce exactly one new attempt.
+Immediate launcher error or attach timeout -> local failure diagnostic retained, failed-through watermark advanced, and the supervisor returns an error so its process exits rather than entering a stable failed state. Continuing the same controller lifetime cannot relaunch the failed generation. A fresh supervisor may bootstrap the same still-pending generation exactly once.
 
 ### RED 8 — concurrent up
 
 Two startup attempts race -> one daemon, one supervisor, one socket owner, both callers obtain truthful terminal status.
 
-Additional hardening tests should cover daemon instance replacement, stale runtime metadata, headless suppression, and conflicting Codex registration without broadening the checkpoint.
+Additional hardening tests should cover daemon instance replacement, stale runtime metadata, headless suppression, independent status-request timeout, terminal discovery/argv contracts, and conflicting Codex registration without broadening the checkpoint.
 
 The existing `TestViewerlessPublicationSignalsCoalesce` remains a useful characterization of the daemon boundary but is not a substitute for these supervisor REDs.
 
@@ -452,27 +457,28 @@ Run on a real Linux graphical desktop with an actually installed supported termi
 4. Publish several generations rapidly before attachment. Still one terminal maximum.
 5. With a viewer attached, publish again. Existing UI updates; no terminal is opened/raised/focused.
 6. Close viewer. Verify no immediate reopen. Publish a later semantic UI; one terminal opens again.
-7. Force launcher failure. Verify no poll-loop respawn; a later new generation may retry once.
+7. Force terminal-launch failure or attach timeout. Verify the supervisor logs the failure, exits, and releases its singleton lock while the daemon and publication remain alive. Run `a2ui up`; verify it reuses the daemon, starts a fresh supervisor, and bootstrap makes one new attempt for that same pending generation.
 8. Kill supervisor only. `a2ui up` restores supervisor without restarting daemon or losing semantic state.
 9. Kill daemon. Verify supervisor reports/logs daemon loss and exits rather than claiming health. `a2ui up` reconciles a new environment.
-10. Exercise `--viewer=never`; verify no terminal spawn.
+10. Exercise `--viewer-policy=never`; verify no terminal spawn.
 11. Exercise SSH/headless/CI-like environment; verify auto-spawn suppression.
 12. Inspect runtime directory/file permissions and deterministic logs.
 
 ## 16. Preservation gates
 
-The future implementation must keep these exact boundaries:
+The implementation must keep these exact boundaries:
 
 - `protocol.Version` remains 1;
 - A2UI node types, mutations, event fields, Document semantics, and publication semantics are unchanged;
 - P0.3 acknowledgement/waiting UX remains unchanged except for lifecycle integration needed to launch the existing TUI;
 - daemon contains no terminal-emulator, focus, workspace, geometry, Omarchy, or window-manager policy;
 - supervisor does not consume or own semantic events;
-- `launch_pending` remains supervisor-local;
+- `launch_pending` and `failed_through_generation` remain supervisor-local;
+- a failed automatic viewer attachment cannot leave a healthy lock-owning supervisor with an unrecoverable pending publication;
 - systemd/autostart remains outside scope.
 
 ## 17. Recommendation
 
-Approve Option B observation: one independent local supervisor using bounded reads of the existing `/status` path, with a minimal additive local runtime-identity hardening of that same status response. Keep daemon and supervisor as independent processes reconciled by `a2ui up`. Use advisory locks, not PID check/start races. Treat the viewer lease as the only successful attach fact. Suppress launch retries through the latest generation observed during a failed attempt. Keep terminal-specific logic behind a Linux launcher boundary.
+Use Option B observation: one independent local supervisor using bounded reads of the existing `/status` path, with a minimal additive local runtime-identity hardening of that same status response. Keep daemon and supervisor as independent processes reconciled by `a2ui up`. Use advisory locks, not PID check/start races. Treat the viewer lease as the authoritative attach fact while requiring automatic launches to cross a real terminal-emulator boundary. Suppress repeated launch attempts for a failed generation within one supervisor lifetime, then exit on launch/attach failure so explicit `a2ui up` repair can bootstrap the same still-pending generation in a fresh lifetime. Keep terminal-specific logic behind a Linux launcher boundary.
 
 This is the narrowest design that satisfies idempotent startup, crash recovery, one-launch coalescing, agent neutrality, and the frozen A2UI V1 boundary without inventing another lifecycle transport.
