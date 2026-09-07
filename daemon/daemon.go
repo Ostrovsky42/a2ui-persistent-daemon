@@ -2,11 +2,7 @@ package daemon
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"a2ui/engine"
@@ -15,14 +11,6 @@ import (
 	"a2ui/session"
 )
 
-type RuntimeIdentity struct {
-	InstanceID string
-	Socket     string
-	Server     string
-}
-
-var fallbackInstanceSequence atomic.Uint64
-
 // Daemon owns the long-lived semantic A2UI state. Terminal clients are views
 // over this state and may disconnect without closing Session or Engine.
 type Daemon struct {
@@ -30,7 +18,6 @@ type Daemon struct {
 	Session *session.Session
 	Actions *a2runtime.ActionRegistry
 	limits  protocol.Limits
-	runtime RuntimeIdentity
 
 	agentMu sync.Mutex
 	lease   clientLease
@@ -42,10 +29,6 @@ type Daemon struct {
 }
 
 func New(sessionID string, limits protocol.Limits, actions *a2runtime.ActionRegistry) *Daemon {
-	return NewWithRuntimeIdentity(sessionID, limits, actions, "", "")
-}
-
-func NewWithRuntimeIdentity(sessionID string, limits protocol.Limits, actions *a2runtime.ActionRegistry, socket, server string) *Daemon {
 	limits = protocol.EffectiveLimits(limits)
 	if actions == nil {
 		actions = engine.NewNoopActions()
@@ -55,26 +38,9 @@ func NewWithRuntimeIdentity(sessionID string, limits protocol.Limits, actions *a
 		Session: session.New(sessionID, limits),
 		Actions: actions,
 		limits:  limits,
-		runtime: RuntimeIdentity{
-			InstanceID: newInstanceID(),
-			Socket:     socket,
-			Server:     server,
-		},
 		updates: make(chan struct{}, 1),
 		eventCh: make(chan struct{}, 1),
 	}
-}
-
-func newInstanceID() string {
-	var raw [16]byte
-	if _, err := rand.Read(raw[:]); err == nil {
-		return hex.EncodeToString(raw[:])
-	}
-	return fmt.Sprintf("fallback-%d-%d", time.Now().UnixNano(), fallbackInstanceSequence.Add(1))
-}
-
-func (d *Daemon) RuntimeIdentity() RuntimeIdentity {
-	return d.runtime
 }
 
 func (d *Daemon) signalSnapshot() {
