@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"a2ui/agentclient"
@@ -122,21 +121,8 @@ func probeServer(ctx context.Context, address string) (bool, error) {
 
 type processViewerLauncher struct{ logPath string }
 
-func (l processViewerLauncher) LaunchViewer(_ context.Context, spec supervisor.ViewerSpec) error {
-	log, err := os.OpenFile(l.logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-	if err != nil {
-		return err
-	}
-	defer log.Close()
-	cmd := exec.Command(spec.Executable, "-socket", spec.Socket, "-preset", spec.Preset)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	devNull, err := os.Open(os.DevNull)
-	if err != nil {
-		return err
-	}
-	defer devNull.Close()
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = devNull, log, log
-	return cmd.Start()
+func (l processViewerLauncher) LaunchViewer(ctx context.Context, spec supervisor.ViewerSpec) error {
+	return launchViewerInTerminal(ctx, spec, l.logPath)
 }
 
 func runSupervisorCommand(ctx context.Context, args []string, stdout, stderr io.Writer) int {
