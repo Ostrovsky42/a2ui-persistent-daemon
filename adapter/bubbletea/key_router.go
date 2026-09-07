@@ -51,9 +51,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	key := msg.String()
 	if key != "" {
-		if _, ok := snapshot.Bindings[key]; ok && m.controller != nil {
+		if binding, ok := snapshot.Bindings[key]; ok && m.controller != nil {
 			if err := m.controller.ActionKey(key); err == nil {
-				m.acknowledgeInteraction("✓ Action accepted · Waiting for agent…", snapshot)
+				label := SanitizeSingleLineText(binding.Label)
+				if label == "" {
+					label = "Action"
+				}
+				m.acknowledgeInteraction("✓ "+label+" requested", snapshot)
 			}
 			return m, nil
 		}
@@ -113,7 +117,7 @@ func (m *Model) handleInputKey(id, value string, msg tea.KeyMsg) bool {
 		_ = m.controller.SetInput(id, string(next))
 	case tea.KeyEnter:
 		if err := m.controller.Submit(id); err == nil {
-			m.acknowledgeInteraction("✓ Submitted: "+SanitizeSingleLineText(value)+" · Waiting for agent…", m.semanticSnapshot())
+			m.acknowledgeInteraction("✓ Submitted: "+SanitizeSingleLineText(value), m.semanticSnapshot())
 		}
 	default:
 		return false
@@ -165,7 +169,7 @@ func (m *Model) handleTableKey(id string, n document.Node, msg tea.KeyMsg) bool 
 		}
 	case tea.KeyEnter:
 		if err := m.controller.ActivateTableSelection(id); err == nil {
-			m.acknowledgeInteraction("✓ Selected · Waiting for agent…", m.semanticSnapshot())
+			m.acknowledgeInteraction("✓ Selected: "+tableSelectionLabel(n, m.semanticSnapshot().TableSelections[id]), m.semanticSnapshot())
 		}
 	default:
 		return false
@@ -177,6 +181,20 @@ func (m *Model) handleTableKey(id string, n document.Node, msg tea.KeyMsg) bool 
 		m.reconcileLocalState()
 	}
 	return true
+}
+
+func tableSelectionLabel(n document.Node, selection a2runtime.TableSelection) string {
+	var rows [][]string
+	_ = json.Unmarshal(n.Props["rows"], &rows)
+	if selection.Index >= 0 && selection.Index < len(rows) && len(rows[selection.Index]) > 0 {
+		if label := SanitizeSingleLineText(rows[selection.Index][0]); label != "" {
+			return label
+		}
+	}
+	if label := SanitizeSingleLineText(selection.RowID); label != "" {
+		return label
+	}
+	return "item"
 }
 
 func (m *Model) handleViewportKey(id string, n document.Node, msg tea.KeyMsg) bool {

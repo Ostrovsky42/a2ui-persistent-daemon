@@ -73,6 +73,19 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 			acknowledgement = ""
 		}
 	}
+	waiting := ""
+	if acknowledgement != "" {
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		waiting = fitPlainText(frames[state.AnimationPhase%uint64(len(frames))]+" Waiting for agent…", availW)
+		// The acknowledgement is the active context while an agent is deciding;
+		// normal operation help returns with the next publication.
+		footer = ""
+		if contentH > 1 {
+			contentH--
+		} else {
+			waiting = ""
+		}
+	}
 	if footer != "" {
 		if contentH > 1 {
 			contentH--
@@ -98,6 +111,12 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 			result.Frame += "\n"
 		}
 		result.Frame += acknowledgement
+	}
+	if waiting != "" {
+		if result.Frame != "" {
+			result.Frame += "\n"
+		}
+		result.Frame += waiting
 	}
 	if footer != "" {
 		if result.Frame != "" {

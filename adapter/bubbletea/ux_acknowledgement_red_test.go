@@ -15,7 +15,7 @@ import (
 func TestUXAcknowledgesSelectLocallyUntilNextPublication(t *testing.T) {
 	eng := newTestEngine()
 	for _, op := range []protocol.Operation{
-		{V: 1, Seq: 1, Op: protocol.OpUpsert, ID: "services", Type: protocol.NodeTable, Parent: "root", Props: json.RawMessage(`{"selectable":true,"action":"service.choose","rows":[["billing"]],"row_ids":["service:billing"]}`)},
+		{V: 1, Seq: 1, Op: protocol.OpUpsert, ID: "services", Type: protocol.NodeTable, Parent: "root", Props: json.RawMessage(`{"selectable":true,"action":"service.choose","rows":[["production"],["staging"]],"row_ids":["production","staging"]}`)},
 		{V: 1, Seq: 2, Op: protocol.OpFocus, ID: "services"},
 		{V: 1, Seq: 3, Op: protocol.OpCommit, Frame: "services"},
 	} {
@@ -35,15 +35,25 @@ func TestUXAcknowledgesSelectLocallyUntilNextPublication(t *testing.T) {
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	ev, ok := eng.NextEvent()
-	if !ok || ev.Ev != "select" || ev.RowID != "service:billing" {
+	if !ok || ev.Ev != "select" || ev.RowID != "production" {
 		t.Fatalf("select=%+v ok=%v", ev, ok)
 	}
 	if _, ok := eng.NextEvent(); ok {
 		t.Fatal("select acknowledgement emitted a second semantic event")
 	}
 	frame := model.View()
-	if !strings.Contains(frame, "Selected") || !strings.Contains(frame, "Waiting for agent") {
+	if !strings.Contains(frame, "Selected: production") || !strings.Contains(frame, "⠋ Waiting for agent") || strings.Contains(frame, "Enter Select") {
 		t.Fatalf("select has no local acknowledgement before a new publication:\n%s", frame)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = updated.(Model)
+	if frame := model.View(); !strings.Contains(frame, "Selected: production") {
+		t.Fatalf("local navigation lost committed choice:\n%s", frame)
+	}
+	updated, _ = model.Update(AnimationTickMsg{Epoch: model.animationEpoch})
+	model = updated.(Model)
+	if frame := model.View(); !strings.Contains(frame, "⠙ Waiting for agent") {
+		t.Fatalf("waiting spinner did not advance:\n%s", frame)
 	}
 	after := eng.PresentationSnapshot()
 	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
@@ -58,7 +68,7 @@ func TestUXAcknowledgesSelectLocallyUntilNextPublication(t *testing.T) {
 	}
 	updated, _ = model.Update(EngineDirtyMsg{})
 	model = updated.(Model)
-	if frame := model.View(); strings.Contains(frame, "Waiting for agent") {
+	if frame := model.View(); strings.Contains(frame, "Waiting for agent") || !strings.Contains(frame, "Enter Select") {
 		t.Fatalf("next publication did not clear acknowledgement:\n%s", frame)
 	}
 }
@@ -79,6 +89,7 @@ func TestUXAcknowledgesSubmitAndDeclaredActionLocally(t *testing.T) {
 		}
 	}
 	model := NewModel(eng, DefaultTheme, nil)
+	before := eng.PresentationSnapshot()
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	if ev, ok := eng.NextEvent(); !ok || ev.Ev != "submit" || ev.Value != "restart image worker" {
@@ -87,8 +98,12 @@ func TestUXAcknowledgesSubmitAndDeclaredActionLocally(t *testing.T) {
 	if _, ok := eng.NextEvent(); ok {
 		t.Fatal("submit acknowledgement emitted a second semantic event")
 	}
-	if frame := model.View(); !strings.Contains(frame, "Submitted") || !strings.Contains(frame, "restart image worker") || !strings.Contains(frame, "Waiting for agent") {
+	if frame := model.View(); !strings.Contains(frame, "Submitted: restart image worker") || !strings.Contains(frame, "Waiting for agent") || strings.Contains(frame, "Enter Submit") {
 		t.Fatalf("submit has no local acknowledgement:\n%s", frame)
+	}
+	after := eng.PresentationSnapshot()
+	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
+		t.Fatalf("submit acknowledgement changed semantic publication: before=%+v after=%+v", before, after)
 	}
 
 }
@@ -109,6 +124,7 @@ func TestUXAcknowledgesDeclaredActionLocally(t *testing.T) {
 		}
 	}
 	model := NewModel(eng, DefaultTheme, nil)
+	before := eng.PresentationSnapshot()
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
 	model = updated.(Model)
 	if ev, ok := eng.NextEvent(); !ok || ev.Ev != "action_result" || ev.Action != "service.retry" {
@@ -120,7 +136,11 @@ func TestUXAcknowledgesDeclaredActionLocally(t *testing.T) {
 	if frame := model.View(); !strings.Contains(frame, "Waiting for agent") {
 		t.Fatalf("action has no local acknowledgement:\n%s", frame)
 	}
-	if frame := model.View(); !strings.Contains(frame, "Action accepted") {
+	if frame := model.View(); !strings.Contains(frame, "Retry requested") {
 		t.Fatalf("action has no local acceptance label:\n%s", frame)
+	}
+	after := eng.PresentationSnapshot()
+	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
+		t.Fatalf("action acknowledgement changed semantic publication: before=%+v after=%+v", before, after)
 	}
 }

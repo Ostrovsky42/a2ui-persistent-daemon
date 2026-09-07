@@ -256,6 +256,9 @@ func (m Model) needsAnimation() bool {
 	if m.controller == nil || m.Renderer == nil {
 		return false
 	}
+	if m.interaction.Acknowledgement != nil {
+		return true
+	}
 	snapshot := m.semanticSnapshot()
 	return m.Renderer.HasActiveAnimation(snapshot.Document, snapshot.FocusedID)
 }
