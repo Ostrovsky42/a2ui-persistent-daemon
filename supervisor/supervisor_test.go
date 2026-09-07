@@ -145,14 +145,17 @@ func TestViewerCloseDoesNotReopenUntilLaterPendingGeneration(t *testing.T) {
 	}
 }
 
-func TestImmediateLaunchFailureSuppressesSameGenerationAndLaterGenerationRetries(t *testing.T) {
+func TestImmediateLaunchFailureIsFatalAndFreshSupervisorBootstrapsSameGeneration(t *testing.T) {
 	launchErr := errors.New("terminal unavailable")
-	launcher := &fakeLauncher{errs: []error{launchErr, nil}}
+	launcher := &fakeLauncher{errs: []error{launchErr}}
 	controller := newTestController(t, launcher)
 	now := time.Unix(600, 0)
 
 	observe(t, controller, testStatus(60, false, false), now)
-	observe(t, controller, testStatus(61, true, false), now.Add(time.Millisecond))
+	status := testStatus(61, true, false)
+	if err := controller.Observe(context.Background(), status, now.Add(time.Millisecond)); err == nil {
+		t.Fatal("launch failure returned nil, want fatal supervisor error")
+	}
 	state := controller.State()
 	if state.LaunchPending {
 		t.Fatal("launch_pending=true after immediate launcher failure")
@@ -164,26 +167,32 @@ func TestImmediateLaunchFailureSuppressesSameGenerationAndLaterGenerationRetries
 		t.Fatal("last failure diagnostic is empty")
 	}
 
-	observe(t, controller, testStatus(61, true, false), now.Add(2*time.Millisecond))
-	observe(t, controller, testStatus(61, true, false), now.Add(3*time.Millisecond))
+	if err := controller.Observe(context.Background(), status, now.Add(2*time.Millisecond)); err != nil {
+		t.Fatalf("same lifetime suppression returned %v", err)
+	}
 	if got := len(launcher.calls); got != 1 {
-		t.Fatalf("same generation launch calls=%d, want 1 total", got)
+		t.Fatalf("same lifetime launch calls=%d, want 1 total", got)
 	}
 
-	observe(t, controller, testStatus(62, true, false), now.Add(4*time.Millisecond))
-	if got := len(launcher.calls); got != 2 {
-		t.Fatalf("later generation launch calls=%d, want 2 total", got)
+	freshLauncher := &fakeLauncher{}
+	fresh := newTestController(t, freshLauncher)
+	observe(t, fresh, status, now.Add(3*time.Millisecond))
+	if got := len(freshLauncher.calls); got != 1 {
+		t.Fatalf("fresh supervisor bootstrap launch calls=%d, want 1", got)
 	}
 }
 
-func TestAttachTimeoutSuppressesSameGeneration(t *testing.T) {
+func TestAttachTimeoutIsFatalAndFreshSupervisorBootstrapsSameGeneration(t *testing.T) {
 	launcher := &fakeLauncher{}
 	controller := newTestController(t, launcher)
 	now := time.Unix(700, 0)
 
 	observe(t, controller, testStatus(70, false, false), now)
-	observe(t, controller, testStatus(71, true, false), now.Add(time.Millisecond))
-	observe(t, controller, testStatus(71, true, false), now.Add(3*time.Second))
+	status := testStatus(71, true, false)
+	observe(t, controller, status, now.Add(time.Millisecond))
+	if err := controller.Observe(context.Background(), status, now.Add(3*time.Second)); err == nil {
+		t.Fatal("attach timeout returned nil, want fatal supervisor error")
+	}
 
 	state := controller.State()
 	if state.LaunchPending {
@@ -196,13 +205,18 @@ func TestAttachTimeoutSuppressesSameGeneration(t *testing.T) {
 		t.Fatal("attach timeout diagnostic is empty")
 	}
 
-	observe(t, controller, testStatus(71, true, false), now.Add(4*time.Second))
-	if got := len(launcher.calls); got != 1 {
-		t.Fatalf("same generation after timeout launch calls=%d, want 1 total", got)
+	if err := controller.Observe(context.Background(), status, now.Add(4*time.Second)); err != nil {
+		t.Fatalf("same lifetime suppression returned %v", err)
 	}
-	observe(t, controller, testStatus(72, true, false), now.Add(5*time.Second))
-	if got := len(launcher.calls); got != 2 {
-		t.Fatalf("new generation after timeout launch calls=%d, want 2 total", got)
+	if got := len(launcher.calls); got != 1 {
+		t.Fatalf("same lifetime launch calls=%d, want 1 total", got)
+	}
+
+	freshLauncher := &fakeLauncher{}
+	fresh := newTestController(t, freshLauncher)
+	observe(t, fresh, status, now.Add(5*time.Second))
+	if got := len(freshLauncher.calls); got != 1 {
+		t.Fatalf("fresh supervisor bootstrap launch calls=%d, want 1", got)
 	}
 }
 
