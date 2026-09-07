@@ -317,16 +317,21 @@ func TestP03ContextFooterIsRendererOnlyAndFocusAware(t *testing.T) {
 		protocol.Operation{V: protocol.Version, Seq: 4, Op: protocol.OpUpsert, ID: "log-text", Type: protocol.NodeText, Parent: "log", Props: json.RawMessage(`{"text":"one\ntwo\nthree\nfour\nfive"}`)},
 		protocol.Operation{V: protocol.Version, Seq: 5, Op: protocol.OpUpsert, ID: "actions", Type: protocol.NodeActions, Parent: "root", Props: json.RawMessage(`{"items":[{"key":"r","label":"Retry","action":"retry"}]}`)},
 	)
-	before := eng.PresentationSnapshot()
-	model := NewModel(eng, DefaultTheme, nil)
-	model.Width, model.Height = 100, 24
-
 	if perr := eng.Focus("workers"); perr != nil {
 		t.Fatal(perr)
 	}
+	model := NewModel(eng, DefaultTheme, nil)
+	model.Width, model.Height = 100, 24
 	model.reconcileLocalState()
+
+	// Establish the real initial visibility acknowledgement first. The footer
+	// must not create any additional publication merely because focus changes.
+	_ = model.View()
+	baselinePublishes := model.PublishCount()
+	before := eng.PresentationSnapshot()
+
 	tableFrame := model.View()
-	for _, hint := range []string{"↑↓ Move", "Home/End Jump", "Enter Select", "Tab Focus", "[R] Retry"} {
+	for _, hint := range []string{"↑↓ Move", "PgUp/PgDn Page", "Home/End Jump", "Enter Select", "Tab Focus", "[R] Retry"} {
 		if !strings.Contains(tableFrame, hint) {
 			t.Fatalf("table footer missing %q:\n%s", hint, tableFrame)
 		}
@@ -364,8 +369,8 @@ func TestP03ContextFooterIsRendererOnlyAndFocusAware(t *testing.T) {
 	if after.Document.Revision != before.Document.Revision || after.PublicationGeneration != before.PublicationGeneration {
 		t.Fatalf("footer mutated semantic state: before=%+v after=%+v", before, after)
 	}
-	if model.PublishCount() != 0 {
-		t.Fatalf("footer triggered publication acknowledgement count=%d", model.PublishCount())
+	if model.PublishCount() != baselinePublishes {
+		t.Fatalf("footer caused publication acknowledgement: before=%d after=%d", baselinePublishes, model.PublishCount())
 	}
 	assertP03NoEvents(t, eng)
 }
