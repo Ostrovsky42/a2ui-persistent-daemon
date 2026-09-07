@@ -30,7 +30,7 @@ func (r *Renderer) renderContextFooter(doc document.Document, focusedID string, 
 		if !propBool(focused, "selectable", false) {
 			return ""
 		}
-		parts = append(parts, "↑↓ Move", "Home/End Jump", "Enter Select", "Tab Focus")
+		parts = append(parts, "↑↓ Move", "PgUp/PgDn Page", "Home/End Jump", "Enter Select", "Tab Focus")
 	case protocol.NodeViewport:
 		if !propBool(focused, "scrollable", false) {
 			return ""
