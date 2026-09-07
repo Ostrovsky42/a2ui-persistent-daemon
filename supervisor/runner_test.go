@@ -3,6 +3,7 @@ package supervisor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -29,9 +30,47 @@ func (f *fakeStatusSource) Status(context.Context) (agentclient.Status, error) {
 	return result.status, result.err
 }
 
+type deadlineCheckingStatusSource struct {
+	status    agentclient.Status
+	minBudget time.Duration
+	observed  bool
+}
+
+func (s *deadlineCheckingStatusSource) Status(ctx context.Context) (agentclient.Status, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return agentclient.Status{}, errors.New("status request has no deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining < s.minBudget {
+		return agentclient.Status{}, fmt.Errorf("status request budget %s is shorter than required %s", remaining, s.minBudget)
+	}
+	s.observed = true
+	return s.status, nil
+}
+
 func TestSupervisorPollIntervalIsApprovedBoundedInterval(t *testing.T) {
 	if PollInterval != 250*time.Millisecond {
 		t.Fatalf("PollInterval=%s, want 250ms", PollInterval)
+	}
+}
+
+func TestPollerRequestBudgetIsIndependentFromPollInterval(t *testing.T) {
+	source := &deadlineCheckingStatusSource{
+		status:    testStatus(95, false, false),
+		minBudget: time.Second,
+	}
+	controller := newTestController(t, &fakeLauncher{})
+	poller, err := NewPoller(PollerConfig{Source: source, Controller: controller, MaxStatusFailures: 1})
+	if err != nil {
+		t.Fatalf("NewPoller: %v", err)
+	}
+
+	if err := poller.Poll(context.Background(), time.Unix(950, 0)); err != nil {
+		t.Fatalf("Poll returned %v, want request deadline substantially larger than %s poll cadence", err, PollInterval)
+	}
+	if !source.observed {
+		t.Fatal("status source did not observe an independent request budget")
 	}
 }
 
