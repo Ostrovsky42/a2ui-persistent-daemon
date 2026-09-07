@@ -9,7 +9,10 @@ import (
 	"a2ui/agentclient"
 )
 
-const PollInterval = 250 * time.Millisecond
+const (
+	PollInterval         = 250 * time.Millisecond
+	StatusRequestTimeout = 2 * time.Second
+)
 
 var ErrStatusUnavailable = errors.New("daemon status unavailable")
 
@@ -21,6 +24,7 @@ type PollerConfig struct {
 	Source            StatusSource
 	Controller        *Controller
 	MaxStatusFailures int
+	RequestTimeout    time.Duration
 }
 
 type Poller struct {
@@ -35,11 +39,14 @@ func NewPoller(config PollerConfig) (*Poller, error) {
 	if config.MaxStatusFailures <= 0 {
 		config.MaxStatusFailures = 3
 	}
+	if config.RequestTimeout <= 0 {
+		config.RequestTimeout = StatusRequestTimeout
+	}
 	return &Poller{config: config}, nil
 }
 
 func (p *Poller) Poll(ctx context.Context, now time.Time) error {
-	requestCtx, cancel := context.WithTimeout(ctx, PollInterval)
+	requestCtx, cancel := context.WithTimeout(ctx, p.config.RequestTimeout)
 	defer cancel()
 
 	status, err := p.config.Source.Status(requestCtx)
