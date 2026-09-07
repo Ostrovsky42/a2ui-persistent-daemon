@@ -203,3 +203,38 @@ func TestWaitEventsAndStatusUseExistingDaemonEndpoints(t *testing.T) {
 		t.Fatalf("status = %#v, want decoded daemon status", status)
 	}
 }
+
+func TestStatusPreservesLocalRuntimeIdentityFields(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/status" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		_, _ = w.Write([]byte(`{"session":"identity","revision":3,"nodes":2,"has_client":false,"generation":4,"pending_publish":true,"instance_id":"instance-1","socket":"/tmp/a2ui identity/a2ui.sock","server":"http://127.0.0.1:18080"}`))
+	}))
+	defer server.Close()
+
+	status, err := New(server.URL, "identity", server.Client()).Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	raw, err := json.Marshal(status)
+	if err != nil {
+		t.Fatalf("marshal status: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("decode marshaled status: %v", err)
+	}
+	for key, want := range map[string]string{
+		"instance_id": "instance-1",
+		"socket":      "/tmp/a2ui identity/a2ui.sock",
+		"server":      "http://127.0.0.1:18080",
+	} {
+		if got[key] != want {
+			t.Fatalf("status %s=%v, want %q; full=%s", key, got[key], want, raw)
+		}
+	}
+}
