@@ -53,11 +53,7 @@ func main() {
 	// after Close a new daemon may already have bound the same pathname.
 	defer closeDaemonListener(ln)
 
-	runtimeServer := ""
-	if *server != "" {
-		runtimeServer = "http://" + *server
-	}
-	d := daemon.NewWithRuntimeIdentity(*session, protocol.DefaultLimits(), nil, path, runtimeServer)
+	d := daemon.New(*session, protocol.DefaultLimits(), nil)
 	errCh := make(chan error, 2)
 	go func() { errCh <- d.Serve(ctx, ln) }()
 
