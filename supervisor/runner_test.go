@@ -104,7 +104,7 @@ func TestPollerAllowsBoundedTransientStatusFailuresThenStops(t *testing.T) {
 	if err := poller.Poll(context.Background(), now.Add(PollInterval)); err != nil {
 		t.Fatalf("second transient failure returned %v", err)
 	}
-	if err := poller.Poll(context.Background(), now.Add(2 * PollInterval)); !errors.Is(err, ErrStatusUnavailable) {
+	if err := poller.Poll(context.Background(), now.Add(2*PollInterval)); !errors.Is(err, ErrStatusUnavailable) {
 		t.Fatalf("third transient failure error=%v, want ErrStatusUnavailable", err)
 	}
 }
