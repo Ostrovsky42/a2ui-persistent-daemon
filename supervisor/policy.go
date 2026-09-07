@@ -23,6 +23,21 @@ func ParseViewerPolicy(value string) (ViewerPolicy, error) {
 	}
 }
 
-func (p ViewerPolicy) Allows(_ func(string) string) bool {
-	return true
+func (p ViewerPolicy) Allows(getenv func(string) string) bool {
+	switch p {
+	case ViewerNever:
+		return false
+	case ViewerAlways:
+		return true
+	case ViewerAuto:
+		if getenv == nil {
+			return false
+		}
+		if getenv("CI") != "" || getenv("SSH_CONNECTION") != "" || getenv("SSH_TTY") != "" {
+			return false
+		}
+		return getenv("DISPLAY") != "" || getenv("WAYLAND_DISPLAY") != ""
+	default:
+		return false
+	}
 }
