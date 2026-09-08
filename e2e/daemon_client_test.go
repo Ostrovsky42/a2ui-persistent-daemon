@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -17,7 +18,12 @@ import (
 
 func startPersistentDaemon(t *testing.T, d *daemon.Daemon) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "a2ui.sock")
+	dir, err := os.MkdirTemp("", "air-e2e-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	path := filepath.Join(dir, "a2ui.sock")
 	ln, perr := ipc.ListenUnix(path)
 	if perr != nil {
 		t.Fatal(perr)
