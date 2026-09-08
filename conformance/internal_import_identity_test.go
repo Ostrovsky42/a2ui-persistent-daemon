@@ -10,6 +10,7 @@ import (
 
 func TestNoLegacyInternalGoImportPrefix(t *testing.T) {
 	root := ".."
+	legacyPrefix := `"a2ui` + `/`
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -28,7 +29,7 @@ func TestNoLegacyInternalGoImportPrefix(t *testing.T) {
 		if readErr != nil {
 			return readErr
 		}
-		if strings.Contains(string(data), `"a2ui/`) {
+		if strings.Contains(string(data), legacyPrefix) {
 			rel, relErr := filepath.Rel(root, path)
 			if relErr != nil {
 				rel = path
