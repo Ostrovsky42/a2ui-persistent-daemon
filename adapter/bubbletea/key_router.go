@@ -50,9 +50,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	key := msg.String()
-	if key != "" {
-		if _, ok := snapshot.Bindings[key]; ok && m.controller != nil {
-			_ = m.controller.ActionKey(key)
+	if key != "" && m.controller != nil {
+		if binding, ok := snapshot.Bindings[key]; ok {
+			_ = m.controller.InvokeAction(binding.NodeID, binding.Action, binding.Args)
 			return m, nil
 		}
 	}
