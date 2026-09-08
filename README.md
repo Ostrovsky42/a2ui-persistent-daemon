@@ -1,4 +1,4 @@
-# AIR — Agent Interaction Runtime
+# Agent Interaction Runtime
 
 A local persistent human-interaction runtime for AI agents.
 
