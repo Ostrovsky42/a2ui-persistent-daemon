@@ -38,6 +38,9 @@ type Engine struct {
 	pendingCommits        []commitRequest
 	maxPendingCommits     int
 	publicationGeneration uint64
+	publishedFrame        string
+	pendingFrame          string
+	pendingRevision       uint64
 }
 
 func New(limits protocol.Limits, eventCapacity int, actions *a2runtime.ActionRegistry) *Engine {
@@ -133,6 +136,8 @@ func (e *Engine) Apply(op protocol.Operation) *protocol.Error {
 	e.doc = next
 	if eff.Commit {
 		e.pendingCommits = append(e.pendingCommits, commitRequest{through: uint64(max64(op.Seq, 0)), frame: op.Frame})
+		e.pendingFrame = op.Frame
+		e.pendingRevision = next.Revision
 	}
 	if e.state.PublicationGeneration != beforePublication || eff.Commit {
 		e.publicationGeneration++
@@ -160,6 +165,24 @@ func (e *Engine) PublicationGeneration() (uint64, bool) {
 	return e.publicationGeneration, e.needsPublishLocked()
 }
 
+func (e *Engine) PublicationMetadata(generation uint64) (string, uint64, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if generation == 0 || generation != e.publicationGeneration {
+		return "", 0, false
+	}
+	if e.needsPublishLocked() {
+		return e.pendingFrame, e.pendingRevision, true
+	}
+	return e.publishedFrame, e.state.PublishedRevision, true
+}
+
+// EventCursor returns the latest internal enqueue position in the semantic
+// event stream. It is an agent-facing causal boundary, not protocol.Event.Seq.
+func (e *Engine) EventCursor() uint64 {
+	return e.broker.Cursor()
+}
+
 func (e *Engine) publishLocked() *protocol.Error {
 	if !e.needsPublishLocked() {
 		return nil
@@ -174,6 +197,9 @@ func (e *Engine) publishLocked() *protocol.Error {
 	}
 	if berr := e.broker.EnqueueCriticalBatch(events); berr != nil {
 		return berr
+	}
+	if len(e.pendingCommits) > 0 {
+		e.publishedFrame = e.pendingCommits[len(e.pendingCommits)-1].frame
 	}
 	e.state.Publish()
 	e.pendingCommits = e.pendingCommits[:0]
@@ -205,6 +231,12 @@ func (e *Engine) PublishGeneration(generation uint64) (bool, *protocol.Error) {
 }
 
 func (e *Engine) NextEvent() (protocol.Event, bool) { return e.broker.Next() }
+
+// NextEventWithCursor preserves the public V1 event while exposing the broker's
+// enqueue-order cursor to local agent-facing adapters.
+func (e *Engine) NextEventWithCursor() (protocol.Event, uint64, bool) {
+	return e.broker.NextWithCursor()
+}
 
 func (e *Engine) SetInput(id, value string) *protocol.Error {
 	e.mu.Lock()
@@ -259,7 +291,7 @@ func (e *Engine) ActivateTableSelection(id string) *protocol.Error {
 	}
 	var action string
 	_ = json.Unmarshal(n.Props["action"], &action)
-	ev := protocol.Event{Ev: "select", ID: id, Row: selection.Index, RowID: selection.RowID, Action: action}
+	ev := protocol.Event{Ev: "select", ID: id, Row: selection.Index, RowID: selection.RowID, Action: action, Revision: e.state.PublishedRevision, Frame: e.publishedFrame}
 	return e.broker.Enqueue(ev, a2runtime.EventCritical)
 }
 
@@ -275,7 +307,7 @@ func (e *Engine) Submit(id string) *protocol.Error {
 	}
 	var action string
 	_ = json.Unmarshal(n.Props["action"], &action)
-	ev := protocol.Event{Ev: "submit", ID: id, Action: action, Value: e.state.InputValues[id]}
+	ev := protocol.Event{Ev: "submit", ID: id, Action: action, Value: e.state.InputValues[id], Revision: e.state.PublishedRevision, Frame: e.publishedFrame}
 	return e.broker.Enqueue(ev, a2runtime.EventCritical)
 }
 
@@ -302,11 +334,15 @@ func (e *Engine) HandleKey(ctx context.Context, key string) *protocol.Error {
 	e.mu.Lock()
 	binding, ok := e.state.Bindings[key]
 	reg := e.actions
+	revision := e.state.PublishedRevision
+	frame := e.publishedFrame
 	e.mu.Unlock()
 	if !ok {
 		return nil
 	}
 	ev := reg.Dispatch(ctx, binding.NodeID, binding.Action, binding.Args)
+	ev.Revision = revision
+	ev.Frame = frame
 	class := a2runtime.EventCritical
 	if err := e.broker.Enqueue(ev, class); err != nil {
 		return err

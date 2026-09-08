@@ -33,11 +33,21 @@ func NewEventBroker(capacity int) *EventBroker {
 }
 
 // order stamps an internal enqueue order into Seq. Next overwrites it with the
-// contiguous externally visible delivery sequence.
+// contiguous externally visible delivery sequence. The internal order is also
+// exposed separately as a causal cursor for agent-facing publication waits.
 func (b *EventBroker) order(ev protocol.Event) protocol.Event {
 	b.nextOrder++
 	ev.Seq = b.nextOrder
 	return ev
+}
+
+// Cursor returns the latest internal enqueue position. It deliberately does not
+// redefine protocol.Event.Seq, whose V1 contract remains contiguous delivery
+// order even when coalescing replaces an undelivered event.
+func (b *EventBroker) Cursor() uint64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.nextOrder
 }
 
 func (b *EventBroker) depthLocked() int {
@@ -100,13 +110,17 @@ func (b *EventBroker) deliver(ev protocol.Event) protocol.Event {
 	return ev
 }
 
-func (b *EventBroker) Next() (protocol.Event, bool) {
+// NextWithCursor returns one event together with the immutable enqueue position
+// at which that event entered the broker. The returned Event.Seq remains the V1
+// contiguous delivery sequence.
+func (b *EventBroker) NextWithCursor() (protocol.Event, uint64, bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if len(b.critical) > 0 {
 		ev := b.critical[0]
 		b.critical = b.critical[1:]
-		return b.deliver(ev), true
+		cursor := ev.Seq
+		return b.deliver(ev), cursor, true
 	}
 	if len(b.coalesced) > 0 {
 		var chosenKey string
@@ -117,14 +131,21 @@ func (b *EventBroker) Next() (protocol.Event, bool) {
 			}
 		}
 		delete(b.coalesced, chosenKey)
-		return b.deliver(chosen), true
+		cursor := chosen.Seq
+		return b.deliver(chosen), cursor, true
 	}
 	if len(b.telemetry) > 0 {
 		ev := b.telemetry[0]
 		b.telemetry = b.telemetry[1:]
-		return b.deliver(ev), true
+		cursor := ev.Seq
+		return b.deliver(ev), cursor, true
 	}
-	return protocol.Event{}, false
+	return protocol.Event{}, 0, false
+}
+
+func (b *EventBroker) Next() (protocol.Event, bool) {
+	ev, _, ok := b.NextWithCursor()
+	return ev, ok
 }
 
 func (b *EventBroker) Depth() int {

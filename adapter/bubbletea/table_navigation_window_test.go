@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func TestTableNavigationSynchronizesDerivedWindowWithoutTableScrollKeys(t *testing.T) {
+func TestTableNavigationSynchronizesDerivedWindowWithoutTableScrollAuthority(t *testing.T) {
 	eng := newTestEngine()
 	rows, rowIDs := tableWindowFixture(20)
 	props, _ := json.Marshal(map[string]any{
@@ -29,7 +29,7 @@ func TestTableNavigationSynchronizesDerivedWindowWithoutTableScrollKeys(t *testi
 	model := NewModelWithPreset(eng, DefaultTheme, PresetMinimal, nil)
 	updated, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: 6})
 	model = updated.(Model)
-	assertTableWindowOffset(t, model, "agents", 10)
+	assertTableWindowOffset(t, model, "agents", 11)
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnd})
 	model = updated.(Model)
@@ -37,15 +37,19 @@ func TestTableNavigationSynchronizesDerivedWindowWithoutTableScrollKeys(t *testi
 	if !ok || selection.Index != 19 {
 		t.Fatalf("End must update runtime selection, got %#v ok=%v", selection, ok)
 	}
-	assertTableWindowOffset(t, model, "agents", 16)
+	assertTableWindowOffset(t, model, "agents", 17)
 
-	// PageDown belongs to scrollable viewports, not tables. It must not create a
-	// second table-scroll authority or move the runtime selection/window.
+	// PageDown is also table-selection navigation in P0.3. At the end it clamps
+	// locally and must neither invent an independent table-scroll authority nor
+	// emit a semantic event.
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyPgDown})
 	model = updated.(Model)
 	selection, ok = eng.SelectedTableRow("agents")
 	if !ok || selection.Index != 19 {
-		t.Fatalf("PageDown unexpectedly changed table selection: %#v ok=%v", selection, ok)
+		t.Fatalf("PageDown at end must clamp selection, got %#v ok=%v", selection, ok)
 	}
-	assertTableWindowOffset(t, model, "agents", 16)
+	assertTableWindowOffset(t, model, "agents", 17)
+	if ev, ok := eng.NextEvent(); ok {
+		t.Fatalf("local table page navigation emitted semantic event: %+v", ev)
+	}
 }

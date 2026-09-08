@@ -61,6 +61,40 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 	if availH < 1 {
 		availH = 1
 	}
+
+	acknowledgement := fitPlainText(state.Acknowledgement, availW)
+	footer := r.renderContextFooter(doc, focusedID, availW)
+	contentH := availH
+	if acknowledgement != "" {
+		if contentH > 1 {
+			contentH--
+		} else {
+			// Preserve the semantic surface when there is no room for local chrome.
+			acknowledgement = ""
+		}
+	}
+	waiting := ""
+	if acknowledgement != "" {
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		waiting = fitPlainText(frames[state.AnimationPhase%uint64(len(frames))]+" Waiting for agent…", availW)
+		// The acknowledgement is the active context while an agent is deciding;
+		// normal operation help returns with the next publication.
+		footer = ""
+		if contentH > 1 {
+			contentH--
+		} else {
+			waiting = ""
+		}
+	}
+	if footer != "" {
+		if contentH > 1 {
+			contentH--
+		} else {
+			// Never hide the entire semantic surface merely to show chrome.
+			footer = ""
+		}
+	}
+
 	ctx := renderContext{
 		doc:             doc,
 		focusedID:       focusedID,
@@ -71,7 +105,25 @@ func (r *Renderer) RenderFrame(doc document.Document, focusedID string, inputs m
 		viewports:       result.Viewports,
 		tables:          result.Tables,
 	}
-	result.Frame = r.renderNode(ctx, "root", availW, availH)
+	result.Frame = r.renderNode(ctx, "root", availW, contentH)
+	if acknowledgement != "" {
+		if result.Frame != "" {
+			result.Frame += "\n"
+		}
+		result.Frame += acknowledgement
+	}
+	if waiting != "" {
+		if result.Frame != "" {
+			result.Frame += "\n"
+		}
+		result.Frame += waiting
+	}
+	if footer != "" {
+		if result.Frame != "" {
+			result.Frame += "\n"
+		}
+		result.Frame += footer
+	}
 	return result
 }
 

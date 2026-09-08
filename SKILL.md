@@ -48,7 +48,6 @@ Failed mutations do not partially apply. Read returned error and correct the nex
 
 Unknown fields are errors in v1. Spell props exactly as defined.
 
-
 ## Semantic presentation
 
 Choose semantic intent, not a renderer theme. Never send a `preset` property. Presets such as `minimal`, `dashboard`, and `dense` are host/renderer configuration.
@@ -91,6 +90,16 @@ For agent-updated selectable tables, prefer stable `row_ids`. When supplied, `ro
 
 User row movement is local and does not emit an event for every arrow key. Explicit activation (`Enter` in a terminal host) emits a critical `select` event carrying `row`, optional `row_id`, and `action`.
 
+## Local interaction hot path
+
+Treat human exploration as renderer/runtime-local work. Publish enough semantic data for the current surface once, then let the terminal host own table navigation, master-detail projection, focus traversal, viewport scrolling, input editing and contextual key help.
+
+Do not wait for or republish on Arrow keys, Home/End, PageUp/PageDown, scrolling, Tab/Shift+Tab, caret movement, or table row inspection. These are not intent commitment. In the terminal host, table Enter is the boundary that emits one `select`; input Enter emits one `submit`; explicitly declared action hotkeys remain semantic actions.
+
+Do not put prose such as "use arrows to move" into the Document. Do not synthesize a separate details surface after each table movement when the data is already present in the table. Stable `row_ids` own selectable identity across reordering and responsive presentation changes.
+
+Use the five canonical V1 compositions in `docs/local-hot-path-recipes.md`: choice, form, master-detail, status-dashboard, and progress-log. They introduce no new node type or mutation.
+
 ## Actions
 
 Use only action IDs advertised/registered by the host. Never invent shell/file/network commands.
@@ -112,7 +121,6 @@ Use `text` only for `text` and `viewport` nodes. Text retention is bounded. Do n
 Normal authoritative UI mutations require a reliable A2UI profile (stdio/NDJSON, HTTP streaming, or host/MCP bridge).
 
 UDP is telemetry-only. Never send document mutations, submit/action control, or commit through UDP.
-
 
 ## Host-local daemon mode
 

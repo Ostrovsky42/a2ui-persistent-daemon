@@ -15,12 +15,19 @@ import (
 // the daemon-owned Session/Engine. It deliberately performs no rendering and
 // never acknowledges publication on behalf of a terminal client.
 func (d *Daemon) HandleMCPMessage(msg mcp.Message) (*mcp.Message, *protocol.Error) {
+	if msg.Method == "a2ui/publish_batch" {
+		return d.handleAgentPublishBatch(msg)
+	}
 	if msg.Method == "a2ui/drain_events" || msg.Method == "a2ui/wait_event" {
 		timeout := 0 * time.Second
 		if msg.Method == "a2ui/wait_event" {
 			timeout = 30 * time.Second
 			var params struct {
-				TimeoutMs int `json:"timeout_ms"`
+				TimeoutMs  int      `json:"timeout_ms"`
+				AfterSeq   uint64   `json:"after_seq"`
+				Frame      string   `json:"frame"`
+				Revision   uint64   `json:"revision"`
+				EventTypes []string `json:"event_types"`
 			}
 			if len(msg.Params) > 0 {
 				_ = json.Unmarshal(msg.Params, &params)
@@ -28,6 +35,12 @@ func (d *Daemon) HandleMCPMessage(msg mcp.Message) (*mcp.Message, *protocol.Erro
 					timeout = time.Duration(params.TimeoutMs) * time.Millisecond
 				}
 			}
+			result := d.WaitSemanticEvents(context.Background(), timeout, EventWaitRequest{AfterCursor: params.AfterSeq, Frame: params.Frame, Revision: params.Revision, EventTypes: params.EventTypes})
+			resRaw, err := json.Marshal(map[string]any{"matched_events": result.MatchedEvents, "observed_events": result.ObservedEvents, "timed_out": result.TimedOut, "events": result.MatchedEvents})
+			if err != nil {
+				return nil, protocol.NewError("mcp.encode_failed", err.Error())
+			}
+			return &mcp.Message{JSONRPC: "2.0", ID: msg.ID, Result: resRaw}, nil
 		}
 		events := d.WaitEvents(context.Background(), timeout)
 		if events == nil {
@@ -153,6 +166,7 @@ func (d *Daemon) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (d *Daemon) serveStatus(w http.ResponseWriter, req *http.Request) {
 	doc := d.Engine.Document()
 	curGen, pending := d.Engine.PublicationGeneration()
+	runtime := d.RuntimeIdentity()
 	status := map[string]any{
 		"session":         d.Session.ID(),
 		"revision":        doc.Revision,
@@ -160,6 +174,9 @@ func (d *Daemon) serveStatus(w http.ResponseWriter, req *http.Request) {
 		"has_client":      d.HasActiveClient(),
 		"generation":      curGen,
 		"pending_publish": pending,
+		"instance_id":     runtime.InstanceID,
+		"socket":          runtime.Socket,
+		"server":          runtime.Server,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

@@ -14,7 +14,7 @@ BINDIR ?= $(PREFIX)/bin
 help:
 	@printf '%s\n' \
 	  'A2UI developer commands:' \
-	  '  make build               Compile a2ui and a2uid binaries to bin/.' \
+	  '  make build               Compile a2ui, a2uid, and a2ui-mcp binaries to bin/.' \
 	  '  make install             Install binaries to $(BINDIR).' \
 	  '  make uninstall           Remove installed binaries from $(BINDIR).' \
 	  '  make demo                Run the automated Agent round-trip demo.' \
@@ -31,15 +31,18 @@ build:
 	@mkdir -p bin
 	go build -o bin/a2ui ./cmd/a2ui
 	go build -o bin/a2uid ./cmd/a2uid
+	go build -o bin/a2ui-mcp ./cmd/a2ui-mcp
 
 install: build
 	install -d $(DESTDIR)$(BINDIR)
 	install -m 0755 bin/a2ui $(DESTDIR)$(BINDIR)/a2ui
 	install -m 0755 bin/a2uid $(DESTDIR)$(BINDIR)/a2uid
+	install -m 0755 bin/a2ui-mcp $(DESTDIR)$(BINDIR)/a2ui-mcp
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/a2ui
 	rm -f $(DESTDIR)$(BINDIR)/a2uid
+	rm -f $(DESTDIR)$(BINDIR)/a2ui-mcp
 
 demo:
 	./scripts/demo/roundtrip.sh

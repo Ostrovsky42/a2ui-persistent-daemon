@@ -54,9 +54,12 @@ a2ui/
 ├── external/                 thread-affine actor для CGO/native APIs
 ├── ipc/                      strict local daemon/client NDJSON control protocol
 ├── daemon/                   persistent Engine + Session owner and IPC server
+├── localenv/                 local lifecycle descriptor, locks, reconciliation
+├── supervisor/               bounded /status polling + viewer lifecycle ownership
 ├── cmd/
-│   ├── a2uid/                persistent daemon
-│   ├── a2ui/                 thin Bubble Tea IPC client
+│   ├── a2uid/                persistent semantic daemon
+│   ├── a2ui/                 TUI + agent CLI + local `up`/supervisor mode
+│   ├── a2ui-mcp/             MCP stdio server backed by the daemon HTTP surface
 │   └── a2ui-runner/          standalone dev/showcase runner
 ├── transport/
 │   ├── httpstream/           ordered streaming handler; HTTP/2-capable over Go TLS
@@ -143,59 +146,103 @@ go run ./cmd/a2ui-runner -scenario interactive -preset minimal -tui
 go run ./cmd/a2ui-runner -scenario interactive -preset dense -tui
 ```
 
-## Persistent daemon / client
+## Persistent daemon / client / local supervisor
 
-System-integration Epic 1 separates semantic lifetime from the terminal window:
+Semantic lifetime отделён и от terminal window, и от shell, из которого был запущен runtime. Основной managed path:
 
 ```text
-Agent / MCP / A2UI envelopes
-            │
-            ▼
-         a2uid
-   Session + Engine + Document
-   Runtime + Events + Actions
-            │
-      Unix domain socket
-            │
-            ▼
-          a2ui
-   Bubble Tea + local caret/scroll
+                  a2ui up
+                     │
+          reconcile / reuse / start
+             ┌───────┴────────┐
+             │                │
+             ▼                ▼
+           a2uid          supervisor
+ Session + Engine +       /status polling
+ Document + Runtime       viewer lifecycle
+             │                │
+             │          pending publication
+             │          + no active viewer
+             │                │
+             │                ▼
+             │        terminal emulator
+             │                │
+             │                ▼
+             └────────────── a2ui
+                         Bubble Tea TUI
 ```
 
-`a2uid` is the sole owner of semantic state. Closing `a2ui` releases only the interactive renderer lease; Document, focus, input values, table selection and the agent session remain alive. The next client receives one atomic `Engine.PresentationSnapshot()` and resumes from the current state. Only one interactive client is accepted at a time.
+`a2uid` остаётся единственным владельцем semantic state. Supervisor не владеет Document, events, publication semantics или agent transport; он только наблюдает authoritative `/status` и управляет desktop viewer lifecycle.
 
-Default socket path is `$XDG_RUNTIME_DIR/a2ui/a2ui.sock`; fallback is `/tmp/a2ui-$UID/a2ui.sock`. The runtime directory is `0700`, socket and startup lock are `0600`. Startup is serialized so concurrent daemons cannot unlink each other while recovering a stale socket.
+`a2ui up` — короткоживущий reconciler. Он сериализует startup, переиспользует совместимый живой daemon/supervisor или запускает отсутствующий процесс, ждёт readiness и возвращает shell. Daemon и supervisor после этого живут независимо.
+
+После `make build` или установки:
+
+```bash
+# managed local environment; default preset=dashboard, viewer policy=auto
+a2ui up
+
+# keep daemon/supervisor but never open a viewer automatically
+a2ui up --viewer-policy never
+
+# explicit desktop launch policy; still requires a supported terminal backend
+a2ui up --viewer-policy always --preset dense
+```
+
+Default socket path — `$XDG_RUNTIME_DIR/a2ui/a2ui.sock`; fallback — `/tmp/a2ui-$UID/a2ui.sock`. Runtime metadata живёт рядом с сокетом: `environment.json`, `up.lock`, `supervisor.lock`, diagnostic PID files и private logs. Runtime directory остаётся `0700`; local metadata/log files — private.
+
+Supervisor опрашивает существующий `/status` с фиксированным cadence 250 ms. Request budget отделён от cadence и по умолчанию составляет 2 s; несколько последовательных failed status reads образуют bounded daemon-loss grace. Supervisor привязан к immutable daemon identity (`instance_id`, socket, server, session) и завершается при доказанной замене/несовместимости daemon вместо того, чтобы фабриковать health.
+
+Authoritative viewer fact — существующий interactive lease (`has_client`). Новый pending publication без viewer запускает не detached TUI, а настоящий terminal emulator. Linux discovery order:
+
+```text
+xdg-terminal-exec
+gnome-terminal
+kitty
+alacritty
+konsole
+```
+
+Запуск строится только через argv, без shell-composed command strings. В `auto` режиме viewer spawn подавляется в CI, SSH и headless environment; `never` запрещает auto-spawn явно, `always` обходит эти environment guards, но не отсутствие terminal backend.
+
+Если host launcher возвращает ошибку или viewer не приобретает lease до attach deadline, supervisor завершает процесс с диагностикой и освобождает `supervisor.lock`. Это сознательный recovery boundary: та же generation не ретраится в poll-loop одного supervisor lifetime. Следующий `a2ui up` переиспользует здоровый daemon, запускает новый supervisor, а bootstrap может сделать одну новую попытку для всё ещё pending generation.
+
+Закрытие `a2ui` освобождает только interactive renderer lease; Document, focus, input values, table selection и agent session остаются в daemon. Следующий client получает atomic `Engine.PresentationSnapshot()` и продолжает с текущего состояния. Одновременно допускается только один interactive client.
+
+Низкоуровневый ручной путь остаётся полезен для разработки и диагностики:
 
 ```bash
 # persistent daemon; optional MCP HTTP bridge
 go run ./cmd/a2uid -server 127.0.0.1:8080
 
-# attach/detach terminal renderer
+# manual attach/detach terminal renderer
 go run ./cmd/a2ui -preset dashboard
 ```
 
-Daemon/client IPC is a **local control protocol**, not a new public A2UI operation set. It uses bounded strict NDJSON with `hello`, `interaction`, `snapshot`, `frame_published`, `detach` and structured `ipc.*` errors. Snapshot delivery never implies visual publication: a pending agent commit is acknowledged only after the client renders that exact publication generation and sends `frame_published`. Disconnect before ACK leaves the barrier pending for the next client.
+Daemon/client IPC — **local control protocol**, а не новый public A2UI operation set. Он использует bounded strict NDJSON с `hello`, `interaction`, `snapshot`, `frame_published`, `detach` и structured `ipc.*` errors. Snapshot delivery не означает visual publication: pending agent commit подтверждается только после render exact publication generation и `frame_published`. Disconnect before ACK оставляет barrier pending для следующего client.
 
-`cmd/a2ui-runner` remains standalone and in-process for renderer development, conformance and CI.
+Важно: `has_client=true` доказывает acquisition renderer lease, но не человеческое внимание или понимание кадра. Manual desktop acceptance реального terminal launch остаётся отдельным host-level доказательством.
+
+`cmd/a2ui-runner` остаётся standalone/in-process инструментом для renderer development, conformance и CI.
 
 ## Developer and agent workflow
 
-Run `make help` from the module root for the persistent-daemon developer commands. The reproducible daemon, smoke, focused-test, and agent operating workflow is documented in [docs/agent-kit.md](docs/agent-kit.md).
+Run `make help` from the module root for the persistent-daemon developer commands. The reproducible daemon, smoke, focused-test, agent CLI and operating workflow is documented in [docs/agent-kit.md](docs/agent-kit.md).
 
 ## Omarchy / protocol / security documentation
 
-The current Omarchy-oriented documentation checkpoint is split by audience instead of duplicating one large spec:
+Omarchy-oriented documentation разделена по аудиториям вместо дублирования одного большого spec:
 
-- [staged Omarchy Manual chapter](docs/manual/a2ui.md) — user-facing draft; explicitly blocked on packaging and a no-JSON agent CLI;
-- [six-operation protocol guide](docs/protocol-guide.md) — practical sequencing and the executable `omarchy-choice.ndjson` fixture;
-- [security model](docs/security-model.md) — threat boundaries and bounded Bash comparison;
-- [security evidence ledger](docs/security-evidence.md) — claim → implementation → test → current status;
-- [Omarchy maintainer proposal draft](docs/omarchy-submission.md) — demo, packaging and upstream gates;
-- [A2UI for Omarchy overview](references/OMARCHY.md) — pitch and links without duplicating the normative protocol.
+- [staged Omarchy Manual chapter](docs/manual/a2ui.md) — user-facing draft;
+- [six-operation protocol guide](docs/protocol-guide.md) — practical sequencing и executable `omarchy-choice.ndjson` fixture;
+- [security model](docs/security-model.md) — threat boundaries и bounded Bash comparison;
+- [security evidence ledger](docs/security-evidence.md) — authoritative claim → implementation → test → status ledger;
+- [Omarchy maintainer proposal draft](docs/omarchy-submission.md) — architecture, demo acceptance, packaging/integration and upstream gates;
+- [A2UI for Omarchy overview](references/OMARCHY.md) — pitch и links без дублирования normative protocol.
 
-`references/PROTOCOL.md` remains normative. The documentation deliberately does **not** claim HTTP caller authentication or terminal escape sanitization until those boundaries have implementation evidence.
+`references/PROTOCOL.md` остаётся normative source для semantic contract. Changing security/release verdicts не дублируются в README: текущие VERIFIED/LIMITED/OPEN claims принадлежат `docs/security-evidence.md`. В частности, terminal-control sanitization имеет regression evidence, тогда как authenticated remote HTTP/MCP ingress не является текущей гарантией.
 
-The documentation package is reviewable now, but it is not yet an upstream-ready Omarchy submission. The remaining product prerequisites are deliberately visible in the Manual and submission draft instead of being represented as existing features.
+Документационный пакет reviewable, но не является готовой upstream Omarchy submission. Перед такой подачей нужны final-candidate verification, clean installed end-to-end demo на выбранной версии Omarchy, реальный desktop acceptance, resource measurements и актуальная reproduction evidence.
 
 ## Transport profiles
 

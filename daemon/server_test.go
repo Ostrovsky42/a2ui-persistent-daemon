@@ -407,3 +407,75 @@ func TestBlockingSnapshotWriteDoesNotHoldEngineMutex(t *testing.T) {
 		t.Fatalf("snapshot read: %v", err)
 	}
 }
+
+func TestP02VisibleFrameAttributionUsesLastAckedRendererGeneration(t *testing.T) {
+	d := New("p0-2-visible-attribution", protocol.DefaultLimits(), nil)
+	apply := func(op protocol.Operation) {
+		if perr := d.Engine.Apply(op); perr != nil {
+			t.Fatal(perr)
+		}
+	}
+	apply(protocol.Operation{V: 1, Seq: 1, Op: protocol.OpUpsert, ID: "targets", Type: protocol.NodeTable, Parent: "root", Props: json.RawMessage(`{"selectable":true,"action":"pick","rows":[["a"]],"row_ids":["a"]}`)})
+	apply(protocol.Operation{V: 1, Seq: 2, Op: protocol.OpCommit, Frame: "A"})
+	path, _ := startTestDaemon(t, d)
+	c := dialTestClient(t, path)
+	defer c.conn.Close()
+	_, snapA := c.hello(t)
+	genA := snapA.Snapshot.Presentation.PublicationGeneration
+	if err := c.w.Write(ipc.Message{V: 1, Kind: ipc.KindFramePublished, PublicationGeneration: genA}); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for d.Engine.NeedsPublish() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	for {
+		if _, ok := d.Engine.NextEvent(); !ok {
+			break
+		}
+	}
+	apply(protocol.Operation{V: 1, Seq: 3, Op: protocol.OpProps, ID: "targets", Props: json.RawMessage(`{"rows":[["b"]],"row_ids":["b"]}`)})
+	apply(protocol.Operation{V: 1, Seq: 4, Op: protocol.OpCommit, Frame: "B"})
+	d.signalSnapshot()
+	snapB, perr, err := c.r.Next()
+	if err != nil || perr != nil || snapB.Kind != ipc.KindSnapshot {
+		t.Fatalf("B snapshot=%+v perr=%v err=%v", snapB, perr, err)
+	}
+	genB := snapB.Snapshot.Presentation.PublicationGeneration
+	if genB == genA {
+		t.Fatal("generation did not advance")
+	}
+	if err := c.w.Write(ipc.Message{V: 1, Kind: ipc.KindInteraction, Interaction: &ipc.Interaction{Type: ipc.InteractionTableActivate, ID: "targets"}}); err != nil {
+		t.Fatal(err)
+	}
+	_, _, _ = c.r.Next()
+	ev, ok := d.Engine.NextEvent()
+	if !ok || ev.Ev != "select" || ev.Frame != "A" || ev.Revision != 1 {
+		t.Fatalf("A-visible event=%+v ok=%v", ev, ok)
+	}
+	if err := c.w.Write(ipc.Message{V: 1, Kind: ipc.KindFramePublished, PublicationGeneration: genB}); err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.Now().Add(time.Second)
+	for d.Engine.NeedsPublish() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	for {
+		ev, ok = d.Engine.NextEvent()
+		if !ok {
+			break
+		}
+		if ev.Ev == "committed" {
+			continue
+		}
+		t.Fatalf("unexpected before B select: %+v", ev)
+	}
+	if err := c.w.Write(ipc.Message{V: 1, Kind: ipc.KindInteraction, Interaction: &ipc.Interaction{Type: ipc.InteractionTableActivate, ID: "targets"}}); err != nil {
+		t.Fatal(err)
+	}
+	_, _, _ = c.r.Next()
+	ev, ok = d.Engine.NextEvent()
+	if !ok || ev.Ev != "select" || ev.Frame != "B" || ev.Revision != 2 {
+		t.Fatalf("B-visible event=%+v ok=%v", ev, ok)
+	}
+}

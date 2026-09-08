@@ -37,8 +37,17 @@ func main() {
 		case "interact":
 			runInteract(os.Args[2:])
 			return
+		case "doctor":
+			os.Exit(runDoctorCommand(context.Background(), os.Args[2:], os.Stdout, os.Stderr, nil))
+		case "setup-codex":
+			os.Exit(runSetupCodexCommand(context.Background(), os.Args[2:], os.Stdout, os.Stderr))
+		case "up":
+			os.Exit(runUpCommand(context.Background(), os.Args[2:], os.Stdout, os.Stderr))
+		case "--supervisor":
+			os.Exit(runSupervisorCommand(context.Background(), os.Args[2:], os.Stdout, os.Stderr))
 		case "-h", "--help", "help":
 			printUsage()
+			printConnectabilityUsage(os.Stdout)
 			return
 		}
 	}
