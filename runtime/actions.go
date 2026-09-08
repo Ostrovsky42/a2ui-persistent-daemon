@@ -44,6 +44,9 @@ func (r *ActionRegistry) Register(id string, h ActionHandler) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if _, exists := r.handlers[id]; exists {
+		return fmt.Errorf("action %s already registered", id)
+	}
 	r.handlers[id] = h
 	return nil
 }
