@@ -18,7 +18,12 @@ jobs:
           go-version: '1.24.x'
           cache: false
       - name: Format gate
-        run: test -z "$(gofmt -l .)"
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            printf '%s\n' "$files"
+            exit 1
+          fi
       - name: Unit and conformance tests
         run: go test ./...
       - name: Race detector
@@ -31,3 +36,17 @@ jobs:
         run: go test ./document -run '^$' -fuzz '^FuzzApplyNeverBreaksDocumentInvariants$' -fuzztime=3s
       - name: IPC codec fuzz smoke
         run: go test ./ipc -run '^$' -fuzz '^FuzzDecodeMessage$' -fuzztime=3s
+
+  macos-core:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Unit and conformance tests
+        run: go test ./...
+      - name: Vet
+        run: go vet ./...
