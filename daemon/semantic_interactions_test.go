@@ -69,7 +69,7 @@ func TestSemanticTableSelectUsesStableRowID(t *testing.T) {
 		ID:     "jobs",
 		Type:   protocol.NodeTable,
 		Parent: "root",
-		Props:  json.RawMessage(`{"columns":["Job"],"rows":[["one"],["two"]],"row_ids":["job-1","job-2"],"selectable":true}`),
+		Props:  json.RawMessage(`{"columns":[{"title":"Job"}],"rows":[["one"],["two"]],"row_ids":["job-1","job-2"],"selectable":true}`),
 	}); perr != nil {
 		t.Fatal(perr)
 	}
