@@ -61,6 +61,7 @@ func (r *Renderer) renderInput(n document.Node, focused bool, currentValue strin
 	if contentW < 1 {
 		contentW = 1
 	}
+	st = st.Width(contentW)
 
 	if !focused {
 		display := currentValue
