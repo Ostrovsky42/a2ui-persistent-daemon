@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 type EventClass int

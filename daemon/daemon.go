@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"a2ui/engine"
-	"a2ui/protocol"
-	a2runtime "a2ui/runtime"
-	"a2ui/session"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/session"
 )
 
 // Daemon owns the long-lived semantic A2UI state. Terminal clients are views

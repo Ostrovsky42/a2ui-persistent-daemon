@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func Apply(current Document, op protocol.Operation, limits protocol.Limits) (Document, Effect, *protocol.Error) {

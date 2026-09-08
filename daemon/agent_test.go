@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"a2ui/ipc"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func agentEnvelope(t *testing.T, d *Daemon, env protocol.Envelope) *protocol.Envelope {

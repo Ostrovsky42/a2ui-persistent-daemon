@@ -8,11 +8,11 @@ import (
 	"os"
 	"time"
 
-	a2tea "a2ui/adapter/bubbletea"
-	"a2ui/e2e"
-	"a2ui/engine"
-	"a2ui/layout"
-	"a2ui/protocol"
+	a2tea "github.com/Ostrovsky42/agent-interaction-runtime/adapter/bubbletea"
+	"github.com/Ostrovsky42/agent-interaction-runtime/e2e"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/layout"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

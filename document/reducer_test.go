@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func up(seq int64, id string, typ protocol.NodeType, parent, props string) protocol.Operation {

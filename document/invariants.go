@@ -1,8 +1,8 @@
 package document
 
 import (
-	"a2ui/protocol"
 	"fmt"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func validateInvariants(d Document, limits protocol.Limits) *protocol.Error {

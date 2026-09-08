@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	a2tea "a2ui/adapter/bubbletea"
-	"a2ui/daemon"
-	"a2ui/ipc"
-	"a2ui/protocol"
+	a2tea "github.com/Ostrovsky42/agent-interaction-runtime/adapter/bubbletea"
+	"github.com/Ostrovsky42/agent-interaction-runtime/daemon"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func startPersistentDaemon(t *testing.T, d *daemon.Daemon) string {

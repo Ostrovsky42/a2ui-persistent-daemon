@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func TestLegacyOperationNormalizesToEnvelope(t *testing.T) {

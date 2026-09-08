@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"a2ui/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
 )
 
 func TestResolveDaemonSocketUsesExplicitThenXDG(t *testing.T) {

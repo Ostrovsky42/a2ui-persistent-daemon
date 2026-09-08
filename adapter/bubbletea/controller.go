@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"a2ui/engine"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 // SemanticController is the renderer/controller boundary used by Bubble Tea.

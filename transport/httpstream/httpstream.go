@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"a2ui/protocol"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 type HandlerFunc func(protocol.Envelope) (protocol.Envelope, *protocol.Error)

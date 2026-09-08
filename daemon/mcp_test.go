@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"a2ui/protocol"
-	"a2ui/transport/mcp"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/transport/mcp"
 )
 
 func TestDaemonHandlesMCPWithoutOwningRenderer(t *testing.T) {
@@ -23,7 +23,7 @@ func TestDaemonHandlesMCPWithoutOwningRenderer(t *testing.T) {
 	if perr != nil {
 		t.Fatal(perr)
 	}
-	if resp == nil || resp.Method != "a2ui/hello_ack" {
+	if resp == nil || resp.Method != "github.com/Ostrovsky42/agent-interaction-runtime/hello_ack" {
 		t.Fatalf("hello response=%+v", resp)
 	}
 
@@ -66,7 +66,7 @@ func TestDaemonServeHTTPUsesExistingMCPContract(t *testing.T) {
 	if perr != nil {
 		t.Fatal(perr)
 	}
-	if decoded.Method != "a2ui/hello_ack" {
+	if decoded.Method != "github.com/Ostrovsky42/agent-interaction-runtime/hello_ack" {
 		t.Fatalf("method=%q", decoded.Method)
 	}
 }
@@ -120,7 +120,7 @@ func TestDaemonServeHTTPStatusAndEvents(t *testing.T) {
 	waitMsg := mcp.Message{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`"w1"`),
-		Method:  "a2ui/wait_event",
+		Method:  "github.com/Ostrovsky42/agent-interaction-runtime/wait_event",
 	}
 	resp, perr := d.HandleMCPMessage(waitMsg)
 	if perr != nil {

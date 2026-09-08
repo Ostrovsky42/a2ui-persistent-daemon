@@ -3,8 +3,8 @@ package a2ui
 import (
 	"time"
 
-	"a2ui/external"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/external"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 )
 
 // ActionRegistry is re-exported for the compact reference facade.

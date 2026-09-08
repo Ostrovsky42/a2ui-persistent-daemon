@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"a2ui/layout"
-	"a2ui/protocol"
-	a2runtime "a2ui/runtime"
-	"a2ui/session"
-	"a2ui/transport/mcp"
+	"github.com/Ostrovsky42/agent-interaction-runtime/layout"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/session"
+	"github.com/Ostrovsky42/agent-interaction-runtime/transport/mcp"
 )
 
 func TestMCPInteractiveFormScenario(t *testing.T) {
@@ -247,7 +247,7 @@ func TestMCPHTTPStreamableEndpoint(t *testing.T) {
 	if res.Header.Get("MCP-Protocol-Version") != "2026-07-28" {
 		t.Fatalf("missing or bad MCP-Protocol-Version: %s", res.Header.Get("MCP-Protocol-Version"))
 	}
-	if res.Header.Get("Mcp-Method") != "a2ui/hello_ack" {
+	if res.Header.Get("Mcp-Method") != "github.com/Ostrovsky42/agent-interaction-runtime/hello_ack" {
 		t.Fatalf("expected Mcp-Method a2ui/hello_ack, got %s", res.Header.Get("Mcp-Method"))
 	}
 

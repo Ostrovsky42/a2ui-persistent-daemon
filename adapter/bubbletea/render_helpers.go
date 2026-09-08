@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"a2ui/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
 	"github.com/charmbracelet/lipgloss"
 )
 

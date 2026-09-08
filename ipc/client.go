@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"a2ui/engine"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 )
 
 const defaultRequestTimeout = 3 * time.Second

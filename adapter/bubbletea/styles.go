@@ -3,7 +3,7 @@ package bubbletea
 import (
 	"encoding/json"
 
-	"a2ui/layout"
+	"github.com/Ostrovsky42/agent-interaction-runtime/layout"
 	"github.com/charmbracelet/lipgloss"
 )
 

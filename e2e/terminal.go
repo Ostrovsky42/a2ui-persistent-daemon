@@ -6,9 +6,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"a2ui/document"
-	"a2ui/layout"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/layout"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 // Cell represents a single terminal cell.

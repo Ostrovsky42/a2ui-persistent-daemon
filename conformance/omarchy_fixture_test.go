@@ -7,9 +7,9 @@ import (
 	"os"
 	"testing"
 
-	"a2ui/daemon"
-	"a2ui/protocol"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/daemon"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 func TestOmarchyChoiceFixtureReplaysAllSixOperations(t *testing.T) {

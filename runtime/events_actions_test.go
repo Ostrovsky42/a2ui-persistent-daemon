@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func TestCriticalEventsNeverSilentlyDrop(t *testing.T) {

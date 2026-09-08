@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"a2ui/document"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 	"github.com/charmbracelet/lipgloss"
 )
 

@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func DecodeRecord(raw []byte) (protocol.Envelope, *protocol.Error) {

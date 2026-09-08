@@ -1,6 +1,6 @@
 package ipc
 
-import "a2ui/protocol"
+import "github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 
 const snapshotJSONExpansionFactor = 8
 

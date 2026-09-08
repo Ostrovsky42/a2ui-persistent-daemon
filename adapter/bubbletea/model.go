@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"a2ui/engine"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

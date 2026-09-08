@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 type ActionHandler func(context.Context, json.RawMessage) error

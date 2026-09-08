@@ -1,6 +1,6 @@
 package daemon
 
-import "a2ui/ipc"
+import "github.com/Ostrovsky42/agent-interaction-runtime/ipc"
 
 func (d *Daemon) ackPublication(generation uint64) *ipc.Error {
 	current, pending := d.Engine.PublicationGeneration()

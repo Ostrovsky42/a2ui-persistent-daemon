@@ -4,8 +4,8 @@
 package a2ui
 
 import (
-	"a2ui/engine"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 // NewVerifiedEngine returns the stdlib-only reference runtime with finite

@@ -5,7 +5,7 @@ package ipc
 import (
 	"testing"
 
-	"a2ui/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
 )
 
 func TestClientSnapshotCacheRejectsOlderRenderGeneration(t *testing.T) {

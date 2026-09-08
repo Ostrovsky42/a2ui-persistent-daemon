@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"a2ui/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
 )
 
 type clientLease struct {

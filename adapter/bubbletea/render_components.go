@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"a2ui/document"
-	"a2ui/layout"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/layout"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 	"github.com/charmbracelet/lipgloss"
 )
 

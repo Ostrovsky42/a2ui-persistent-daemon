@@ -3,7 +3,7 @@ package bubbletea
 import (
 	"fmt"
 
-	"a2ui/layout"
+	"github.com/Ostrovsky42/agent-interaction-runtime/layout"
 )
 
 // Preset controls renderer-local presentation only. It is deliberately not a

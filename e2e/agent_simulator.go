@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"a2ui/layout"
-	"a2ui/protocol"
-	"a2ui/transport/mcp"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/layout"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/transport/mcp"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 // AgentSimulator models an autonomous AI agent driving an A2UI session via

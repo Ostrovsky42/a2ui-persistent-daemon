@@ -3,7 +3,7 @@ package document
 import (
 	"encoding/json"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 type Node struct {

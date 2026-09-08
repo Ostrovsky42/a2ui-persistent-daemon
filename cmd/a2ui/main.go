@@ -9,9 +9,9 @@ import (
 	"os"
 	"time"
 
-	a2tea "a2ui/adapter/bubbletea"
-	"a2ui/ipc"
-	"a2ui/protocol"
+	a2tea "github.com/Ostrovsky42/agent-interaction-runtime/adapter/bubbletea"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

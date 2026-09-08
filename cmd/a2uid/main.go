@@ -14,9 +14,9 @@ import (
 	"syscall"
 	"time"
 
-	"a2ui/daemon"
-	"a2ui/ipc"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/daemon"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func resolveDaemonSocket(explicit, xdg string, uid int) string {

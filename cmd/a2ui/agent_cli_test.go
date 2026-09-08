@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"a2ui/daemon"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/daemon"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func captureStdout(fn func()) string {

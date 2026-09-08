@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"a2ui/document"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 // TableSelection is renderer-independent semantic interaction state. RowID is

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func applyRelocationOp(t *testing.T, e *Engine, op protocol.Operation) {

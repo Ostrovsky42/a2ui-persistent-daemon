@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"a2ui/ipc"
-	"a2ui/protocol"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 )
 
 func TestSemanticActionInvokeDoesNotRequirePhysicalKey(t *testing.T) {

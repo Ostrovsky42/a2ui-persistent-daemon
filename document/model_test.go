@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func TestModelSequenceNeverBreaksDocumentInvariants(t *testing.T) {

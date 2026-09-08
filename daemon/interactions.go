@@ -3,8 +3,8 @@ package daemon
 import (
 	"context"
 
-	"a2ui/ipc"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func semanticIPCError(perr *protocol.Error) *ipc.Error {

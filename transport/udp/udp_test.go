@@ -1,8 +1,8 @@
 package udp
 
 import (
-	"a2ui/protocol"
 	"encoding/json"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 	"testing"
 )
 

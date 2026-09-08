@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"testing"
 
-	"a2ui/engine"
-	"a2ui/protocol"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 type summary struct {

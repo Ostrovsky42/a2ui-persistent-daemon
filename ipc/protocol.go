@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"a2ui/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
 )
 
 const Version = 1
