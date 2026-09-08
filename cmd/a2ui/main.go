@@ -37,6 +37,9 @@ func main() {
 		case "interact":
 			runInteract(os.Args[2:])
 			return
+		case "web":
+			runWeb(os.Args[2:])
+			return
 		case "-h", "--help", "help":
 			printUsage()
 			return
