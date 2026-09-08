@@ -1,4 +1,4 @@
-module a2ui
+module github.com/Ostrovsky42/agent-interaction-runtime
 
 go 1.24.0
 

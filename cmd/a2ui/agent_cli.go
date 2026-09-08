@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"a2ui/ipc"
-	"a2ui/protocol"
-	"a2ui/transport/mcp"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/transport/mcp"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 func defaultEnv(envKey, fallback string) string {

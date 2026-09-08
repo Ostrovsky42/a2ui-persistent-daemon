@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"a2ui/daemon"
-	"a2ui/ipc"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/daemon"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func startDaemonForClientTest(t *testing.T, d *daemon.Daemon) string {

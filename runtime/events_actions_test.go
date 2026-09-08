@@ -3,10 +3,11 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func TestCriticalEventsNeverSilentlyDrop(t *testing.T) {
@@ -49,6 +50,16 @@ func TestActionRegistryRejectsNilAndUnknown(t *testing.T) {
 	ev := r.Dispatch(context.Background(), "node", "missing", json.RawMessage(`{}`))
 	if ev.Ev != "error" || ev.Code != "action.not_permitted" {
 		t.Fatalf("got %+v", ev)
+	}
+}
+
+func TestActionRegistryRejectsDuplicateRegistration(t *testing.T) {
+	r := NewActionRegistry(time.Second, 1)
+	if err := r.Register("delete", func(context.Context, json.RawMessage) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Register("delete", func(context.Context, json.RawMessage) error { return nil }); err == nil {
+		t.Fatal("duplicate action registration silently replaced the trusted handler")
 	}
 }
 
@@ -128,6 +139,55 @@ func TestEventBrokerDeliveredSequenceStaysContiguousAfterCoalescing(t *testing.T
 	}
 	if first.Seq != 1 || second.Seq != 2 {
 		t.Fatalf("delivered sequence has a gap: first=%d second=%d", first.Seq, second.Seq)
+	}
+}
+
+func TestEventBrokerPendingEventsDoNotUseProtocolSeqForQueueOrder(t *testing.T) {
+	b := NewEventBroker(4)
+	if err := b.Enqueue(protocol.Event{Ev: "resize", ID: "screen", W: 80, H: 24}, EventCoalescible); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Enqueue(protocol.Event{Ev: "submit", ID: "input"}, EventCritical); err != nil {
+		t.Fatal(err)
+	}
+
+	eventType := reflect.TypeOf(protocol.Event{})
+	var stamped []uint64
+	var walk func(reflect.Value)
+	walk = func(v reflect.Value) {
+		if !v.IsValid() {
+			return
+		}
+		if v.Type() == eventType {
+			seq := v.FieldByName("Seq").Uint()
+			if seq != 0 {
+				stamped = append(stamped, seq)
+			}
+			return
+		}
+		switch v.Kind() {
+		case reflect.Pointer, reflect.Interface:
+			if !v.IsNil() {
+				walk(v.Elem())
+			}
+		case reflect.Struct:
+			for i := 0; i < v.NumField(); i++ {
+				walk(v.Field(i))
+			}
+		case reflect.Slice, reflect.Array:
+			for i := 0; i < v.Len(); i++ {
+				walk(v.Index(i))
+			}
+		case reflect.Map:
+			iter := v.MapRange()
+			for iter.Next() {
+				walk(iter.Value())
+			}
+		}
+	}
+	walk(reflect.ValueOf(b).Elem())
+	if len(stamped) != 0 {
+		t.Fatalf("pending protocol events already carry delivery seq values: %v", stamped)
 	}
 }
 

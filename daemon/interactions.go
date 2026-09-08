@@ -3,8 +3,8 @@ package daemon
 import (
 	"context"
 
-	"a2ui/ipc"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/ipc"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func semanticIPCError(perr *protocol.Error) *ipc.Error {
@@ -28,9 +28,15 @@ func (d *Daemon) handleInteraction(ctx context.Context, in *ipc.Interaction) *ip
 		perr = d.Engine.Submit(in.ID)
 	case ipc.InteractionTableMove:
 		perr = d.Engine.MoveTableSelection(in.ID, in.Delta)
+	case ipc.InteractionTableSelect:
+		perr = d.Engine.SetTableSelectionByRowID(in.ID, in.RowID)
 	case ipc.InteractionTableActivate:
 		perr = d.Engine.ActivateTableSelection(in.ID)
+	case ipc.InteractionActionInvoke:
+		perr = d.Engine.InvokeAction(ctx, in.ID, in.Action, in.Args)
 	case ipc.InteractionActionKey:
+		// Compatibility path for older local clients. New renderers translate
+		// physical input into semantic action invocation before crossing IPC.
 		perr = d.Engine.HandleKey(ctx, in.Key)
 	default:
 		return ipc.NewError("ipc.invalid_interaction", "unsupported interaction")

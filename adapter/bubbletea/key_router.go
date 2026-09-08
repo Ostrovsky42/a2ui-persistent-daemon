@@ -3,9 +3,9 @@ package bubbletea
 import (
 	"encoding/json"
 
-	"a2ui/document"
-	"a2ui/protocol"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -50,9 +50,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	key := msg.String()
-	if key != "" {
-		if _, ok := snapshot.Bindings[key]; ok && m.controller != nil {
-			_ = m.controller.ActionKey(key)
+	if key != "" && m.controller != nil {
+		if binding, ok := snapshot.Bindings[key]; ok {
+			_ = m.controller.InvokeAction(binding.NodeID, binding.Action, binding.Args)
 			return m, nil
 		}
 	}

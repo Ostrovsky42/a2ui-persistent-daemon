@@ -7,17 +7,17 @@ import (
 	"net/http"
 	"time"
 
-	"a2ui/protocol"
-	"a2ui/transport/mcp"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/transport/mcp"
 )
 
 // HandleMCPMessage bridges the existing public A2UI MCP envelope contract into
 // the daemon-owned Session/Engine. It deliberately performs no rendering and
 // never acknowledges publication on behalf of a terminal client.
 func (d *Daemon) HandleMCPMessage(msg mcp.Message) (*mcp.Message, *protocol.Error) {
-	if msg.Method == "a2ui/drain_events" || msg.Method == "a2ui/wait_event" {
+	if msg.Method == "github.com/Ostrovsky42/agent-interaction-runtime/drain_events" || msg.Method == "github.com/Ostrovsky42/agent-interaction-runtime/wait_event" {
 		timeout := 0 * time.Second
-		if msg.Method == "a2ui/wait_event" {
+		if msg.Method == "github.com/Ostrovsky42/agent-interaction-runtime/wait_event" {
 			timeout = 30 * time.Second
 			var params struct {
 				TimeoutMs int `json:"timeout_ms"`

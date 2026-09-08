@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
-	"a2ui/document"
-	"a2ui/protocol"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 )
 
 type PresentationSnapshot struct {
@@ -232,6 +233,12 @@ func (e *Engine) SetTableSelection(id string, index int) *protocol.Error {
 	return e.state.SetTableSelection(e.doc, id, index)
 }
 
+func (e *Engine) SetTableSelectionByRowID(id, rowID string) *protocol.Error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.state.SetTableSelectionByRowID(e.doc, id, rowID)
+}
+
 func (e *Engine) MoveTableSelection(id string, delta int) *protocol.Error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -298,20 +305,61 @@ func (e *Engine) HasKeyBinding(key string) bool {
 	return ok
 }
 
+func equivalentArgs(a, b json.RawMessage) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	if len(a) == 0 {
+		a = json.RawMessage("null")
+	}
+	if len(b) == 0 {
+		b = json.RawMessage("null")
+	}
+	var av, bv any
+	if json.Unmarshal(a, &av) != nil || json.Unmarshal(b, &bv) != nil {
+		return false
+	}
+	return reflect.DeepEqual(av, bv)
+}
+
+func (e *Engine) dispatchBinding(ctx context.Context, binding a2runtime.Binding) *protocol.Error {
+	ev := e.actions.Dispatch(ctx, binding.NodeID, binding.Action, append(json.RawMessage(nil), binding.Args...))
+	return e.broker.Enqueue(ev, a2runtime.EventCritical)
+}
+
+// InvokeAction dispatches only an action that is currently exposed by the
+// semantic Document/runtime binding projection. A renderer cannot use this API
+// to reach an arbitrary registered host capability.
+func (e *Engine) InvokeAction(ctx context.Context, nodeID, action string, args json.RawMessage) *protocol.Error {
+	e.mu.Lock()
+	var matched a2runtime.Binding
+	found := false
+	for _, binding := range e.state.Bindings {
+		if binding.NodeID == nodeID && binding.Action == action && equivalentArgs(binding.Args, args) {
+			matched = binding
+			matched.Args = append(json.RawMessage(nil), binding.Args...)
+			found = true
+			break
+		}
+	}
+	e.mu.Unlock()
+	if !found {
+		return protocol.NewError("action.not_permitted", "action is not exposed by the current semantic surface")
+	}
+	return e.dispatchBinding(ctx, matched)
+}
+
 func (e *Engine) HandleKey(ctx context.Context, key string) *protocol.Error {
 	e.mu.Lock()
 	binding, ok := e.state.Bindings[key]
-	reg := e.actions
+	if ok {
+		binding.Args = append(json.RawMessage(nil), binding.Args...)
+	}
 	e.mu.Unlock()
 	if !ok {
 		return nil
 	}
-	ev := reg.Dispatch(ctx, binding.NodeID, binding.Action, binding.Args)
-	class := a2runtime.EventCritical
-	if err := e.broker.Enqueue(ev, class); err != nil {
-		return err
-	}
-	return nil
+	return e.dispatchBinding(ctx, binding)
 }
 
 func max64(a, b int64) int64 {

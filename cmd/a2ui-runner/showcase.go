@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"a2ui/engine"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 // buildShowcaseEngine creates one canonical semantic document used to inspect

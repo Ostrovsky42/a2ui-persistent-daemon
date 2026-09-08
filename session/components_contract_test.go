@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func TestHelloAckComponentsAreExactV1EndpointAllowlist(t *testing.T) {

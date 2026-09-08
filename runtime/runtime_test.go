@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"a2ui/document"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func apply(t *testing.T, s *State, d document.Document, op protocol.Operation) document.Document {

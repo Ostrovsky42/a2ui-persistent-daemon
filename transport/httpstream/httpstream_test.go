@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"a2ui/protocol"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 func TestHandlerPreservesReliableRecordOrder(t *testing.T) {

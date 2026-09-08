@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"a2ui/protocol"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 const Magic = "A2UI"

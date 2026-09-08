@@ -1,11 +1,12 @@
 package ipc
 
 import (
-	"a2ui/engine"
-	"a2ui/protocol"
 	"bytes"
 	"errors"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 	"io"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -32,7 +33,7 @@ func TestCodecRoundTripsCoreMessages(t *testing.T) {
 			t.Fatalf("roundtrip mismatch for %s: got %+v want %+v", want.Kind, got, want)
 		}
 		if want.Interaction != nil {
-			if got.Interaction == nil || *got.Interaction != *want.Interaction {
+			if got.Interaction == nil || !reflect.DeepEqual(*got.Interaction, *want.Interaction) {
 				t.Fatalf("interaction mismatch: got %+v want %+v", got.Interaction, want.Interaction)
 			}
 		}

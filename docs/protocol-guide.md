@@ -1,12 +1,12 @@
-# A2UI six-operation protocol guide
+# AIR six-operation protocol guide
 
-This is a practical guide to the public A2UI v1 mutation vocabulary. The normative contract remains [`references/PROTOCOL.md`](../references/PROTOCOL.md).
+This is a practical guide to the public AIR/1 mutation vocabulary. The normative contract remains [`references/PROTOCOL.md`](../references/PROTOCOL.md).
 
-A2UI is not "NDJSON as a UI format." The semantic protocol is transport-independent. NDJSON is one record/debug representation; hardened reliable sessions wrap mutations in versioned envelopes.
+AIR is not "NDJSON as a UI format." The semantic protocol is transport-independent. NDJSON is one record/debug representation; hardened reliable sessions wrap mutations in versioned envelopes.
 
 ## The six mutations
 
-A2UI v1 has exactly six public mutation types:
+AIR/1 has exactly six public mutation types:
 
 ```text
 upsert
@@ -287,7 +287,7 @@ committed event
 
 A socket write alone is not publication. A stale renderer acknowledgement cannot publish a newer generation.
 
-`frame_published` is internal daemon/client IPC, not a seventh public A2UI mutation.
+`frame_published` is internal daemon/client IPC, not a seventh public AIR mutation.
 
 ---
 
@@ -319,7 +319,7 @@ Registered handlers are still privileged host capabilities and belong to the sec
 
 ## Strict JSON and validation
 
-A2UI's strict JSON entry points reject:
+AIR's strict JSON entry points reject:
 
 - duplicate object keys;
 - unknown struct fields;
@@ -362,7 +362,7 @@ The local daemon/client snapshot protocol has a separate bounded record budget l
 
 ## Renderer-neutral versus renderer-local state
 
-A2UI keeps three different authorities:
+AIR keeps three different authorities:
 
 ```text
 Document

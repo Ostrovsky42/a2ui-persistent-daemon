@@ -1,8 +1,8 @@
 package mcp
 
 import (
-	"a2ui/protocol"
 	"encoding/json"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 	"testing"
 )
 
@@ -12,7 +12,7 @@ func TestEnvelopeMapsToJSONRPCNotificationAndBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if msg.JSONRPC != "2.0" || msg.Method != "a2ui/event" || len(msg.ID) != 0 {
+	if msg.JSONRPC != "2.0" || msg.Method != "github.com/Ostrovsky42/agent-interaction-runtime/event" || len(msg.ID) != 0 {
 		t.Fatalf("msg=%+v", msg)
 	}
 	got, perr := EnvelopeFromMessage(msg)
@@ -38,7 +38,7 @@ func TestModernMCPHTTPHeadersAreSelfDescribing(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := HTTPHeaders(msg)
-	if h.Get("MCP-Protocol-Version") != "2026-07-28" || h.Get("Mcp-Method") != "a2ui/operation" {
+	if h.Get("MCP-Protocol-Version") != "2026-07-28" || h.Get("Mcp-Method") != "github.com/Ostrovsky42/agent-interaction-runtime/operation" {
 		t.Fatalf("headers=%v", h)
 	}
 	if perr := ValidateHTTPHeaders(h, msg); perr != nil {
@@ -59,7 +59,7 @@ func TestEnvelopeFromMessageStrictlyValidatesEnvelopeParams(t *testing.T) {
 		{`{"v":1,"session":"s","kind":"event","kind":"telemetry","seq":1,"payload":{}}`, "wire.duplicate_key"},
 	}
 	for _, tc := range cases {
-		_, perr := EnvelopeFromMessage(Message{JSONRPC: "2.0", Method: "a2ui/event", Params: json.RawMessage(tc.params)})
+		_, perr := EnvelopeFromMessage(Message{JSONRPC: "2.0", Method: "github.com/Ostrovsky42/agent-interaction-runtime/event", Params: json.RawMessage(tc.params)})
 		if perr == nil || perr.Code != tc.code {
 			t.Fatalf("params=%s got %#v", tc.params, perr)
 		}
@@ -71,8 +71,8 @@ func TestDecodeMessageRejectsAmbiguousOrUnknownJSONRPCFields(t *testing.T) {
 		raw  string
 		code string
 	}{
-		{`{"jsonrpc":"2.0","method":"a2ui/event","method":"a2ui/telemetry","params":{}}`, "wire.duplicate_key"},
-		{`{"jsonrpc":"2.0","method":"a2ui/event","params":{},"wat":1}`, "wire.unknown_field"},
+		{`{"jsonrpc":"2.0","method":"github.com/Ostrovsky42/agent-interaction-runtime/event","method":"github.com/Ostrovsky42/agent-interaction-runtime/telemetry","params":{}}`, "wire.duplicate_key"},
+		{`{"jsonrpc":"2.0","method":"github.com/Ostrovsky42/agent-interaction-runtime/event","params":{},"wat":1}`, "wire.unknown_field"},
 	}
 	for _, tc := range cases {
 		_, perr := DecodeMessage([]byte(tc.raw))
@@ -92,7 +92,7 @@ func TestNotificationRejectsInvalidA2UIEnvelope(t *testing.T) {
 func TestEnvelopeFromMessageValidatesNestedA2UIPayload(t *testing.T) {
 	msg := Message{
 		JSONRPC: "2.0",
-		Method:  "a2ui/operation",
+		Method:  "github.com/Ostrovsky42/agent-interaction-runtime/operation",
 		Params:  json.RawMessage(`{"v":1,"session":"s","kind":"operation","seq":2,"payload":{"v":1,"seq":1,"op":"commit"}}`),
 	}
 	_, perr := EnvelopeFromMessage(msg)

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	a2tea "a2ui/adapter/bubbletea"
-	"a2ui/protocol"
+	a2tea "github.com/Ostrovsky42/agent-interaction-runtime/adapter/bubbletea"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

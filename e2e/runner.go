@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"sync"
 
-	"a2ui/document"
-	"a2ui/engine"
-	"a2ui/protocol"
-	a2runtime "a2ui/runtime"
-	"a2ui/session"
-	"a2ui/transport/mcp"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/session"
+	"github.com/Ostrovsky42/agent-interaction-runtime/transport/mcp"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 // Runner manages a complete A2UI node: Engine, Session state machine, Action

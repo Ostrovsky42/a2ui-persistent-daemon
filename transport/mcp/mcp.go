@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"a2ui/protocol"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 type Message struct {
@@ -36,29 +36,29 @@ func DecodeMessage(raw []byte) (Message, *protocol.Error) {
 func methodFor(k protocol.EnvelopeKind) (string, bool) {
 	switch k {
 	case protocol.KindHello:
-		return "a2ui/hello", true
+		return "github.com/Ostrovsky42/agent-interaction-runtime/hello", true
 	case protocol.KindHelloAck:
-		return "a2ui/hello_ack", true
+		return "github.com/Ostrovsky42/agent-interaction-runtime/hello_ack", true
 	case protocol.KindOperation:
-		return "a2ui/operation", true
+		return "github.com/Ostrovsky42/agent-interaction-runtime/operation", true
 	case protocol.KindEvent:
-		return "a2ui/event", true
+		return "github.com/Ostrovsky42/agent-interaction-runtime/event", true
 	case protocol.KindTelemetry:
-		return "a2ui/telemetry", true
+		return "github.com/Ostrovsky42/agent-interaction-runtime/telemetry", true
 	}
 	return "", false
 }
 func kindFor(m string) (protocol.EnvelopeKind, bool) {
 	switch m {
-	case "a2ui/hello":
+	case "github.com/Ostrovsky42/agent-interaction-runtime/hello":
 		return protocol.KindHello, true
-	case "a2ui/hello_ack":
+	case "github.com/Ostrovsky42/agent-interaction-runtime/hello_ack":
 		return protocol.KindHelloAck, true
-	case "a2ui/operation":
+	case "github.com/Ostrovsky42/agent-interaction-runtime/operation":
 		return protocol.KindOperation, true
-	case "a2ui/event":
+	case "github.com/Ostrovsky42/agent-interaction-runtime/event":
 		return protocol.KindEvent, true
-	case "a2ui/telemetry":
+	case "github.com/Ostrovsky42/agent-interaction-runtime/telemetry":
 		return protocol.KindTelemetry, true
 	}
 	return "", false

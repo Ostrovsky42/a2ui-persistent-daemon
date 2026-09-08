@@ -3,8 +3,8 @@ package bubbletea
 import (
 	"encoding/json"
 
-	"a2ui/document"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 )
 
 func resolveTableViewportMetrics(n document.Node, selection a2runtime.TableSelection, maxW, maxH, rowOffset int) TableViewportMetrics {

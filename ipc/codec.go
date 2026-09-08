@@ -9,7 +9,7 @@ import (
 	"io"
 	"sync"
 
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 const DefaultMaxMessageBytes = 16 << 20

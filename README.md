@@ -1,8 +1,8 @@
 # Agent Interaction Runtime
 
-A local persistent human-interaction runtime for AI agents.
+A local long-lived human-interaction runtime for AI agents.
 
-> **Historical naming.** This repository was originally developed under the name A2UI. Its current `A2UI V1` wire dialect predates and is not an implementation of Google's [A2UI specification](https://github.com/google/A2UI). The wire models are different and currently not compatible. External A2UI compatibility is an explicitly open architectural question described in [Direction](#direction).
+> **Historical naming.** This repository was originally developed under the name A2UI. The wire dialect now called `AIR/1` descends from that original protocol and predates Google's [A2UI specification](https://github.com/google/A2UI); the wire models are different and currently not compatible. External A2UI compatibility remains an explicitly open architectural question described in [Direction](#direction).
 
 AIR separates the lifetime of an agent session from the lifetime of the surface a human happens to be looking at.
 
@@ -11,7 +11,7 @@ An agent describes *what it needs from a human* as declarative semantic UI. A lo
 ```text
 agent publishes intent
       ↓
-state survives
+daemon-owned state survives renderer loss
       ↓
 human surface appears
       ↓
@@ -37,12 +37,12 @@ Binding these into one process is the architectural mistake this project exists 
 
 **What this is not.** AIR is not a TUI framework. Bubble Tea, Ratatui, Textual and Ink already solve terminal rendering well; the Bubble Tea adapter here consumes that layer rather than competing with it. The engineering weight sits in the runtime: authoritative state, transactional mutation, publication generations, renderer acknowledgement, reconnect, interactive lease, event causality and process ownership.
 
-The current `A2UI V1` protocol is one semantic dialect used by AIR, not the definition of the project. NDJSON, HTTP streaming, MCP and UDP telemetry remain transport profiles around that semantic core.
+The current `AIR/1` protocol is one semantic dialect used by AIR, not the definition of the project. NDJSON, HTTP streaming, MCP and UDP telemetry remain transport profiles around that semantic core.
 
 ```text
                AIR interaction runtime
                         │
-                 A2UI V1 dialect
+                 AIR/1 dialect
                         │
        ┌────────────────┼────────────────┐
        │                │                │
@@ -80,8 +80,8 @@ UDP telemetry ────── lossy side profile only
 ## Packages
 
 ```text
-a2ui/
-├── protocol/                 current A2UI V1 wire dialect, validation, limits, errors
+agent-interaction-runtime/
+├── protocol/                 current AIR/1 wire dialect, validation, limits, errors
 ├── document/                 authoritative tree + transactional reducer
 ├── runtime/                  focus, input-local state, bindings, events, actions
 ├── engine/                   Document + runtime + event broker integration
@@ -90,9 +90,9 @@ a2ui/
 ├── layout/                   renderer-neutral box model + deterministic flex allocator
 ├── external/                 thread-affine actor for CGO/native APIs
 ├── ipc/                      strict local daemon/client NDJSON control protocol
-├── daemon/                   persistent Engine + Session owner and IPC server
+├── daemon/                   long-lived Engine + Session owner and IPC server
 ├── cmd/
-│   ├── a2uid/                persistent daemon
+│   ├── a2uid/                long-lived daemon
 │   ├── a2ui/                 thin Bubble Tea IPC client
 │   └── a2ui-runner/          standalone dev/showcase runner
 ├── transport/
@@ -115,8 +115,8 @@ package main
 import (
     "encoding/json"
 
-    "a2ui/engine"
-    "a2ui/protocol"
+    "github.com/Ostrovsky42/agent-interaction-runtime/engine"
+    "github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 func main() {
@@ -182,12 +182,12 @@ go run ./cmd/a2ui-runner -scenario interactive -preset minimal -tui
 go run ./cmd/a2ui-runner -scenario interactive -preset dense -tui
 ```
 
-## Persistent daemon / client
+## Long-lived daemon / client
 
-The persistent runtime separates semantic lifetime from terminal-window lifetime:
+The long-lived runtime separates semantic lifetime from terminal-window lifetime:
 
 ```text
-Agent / MCP / A2UI V1 envelopes
+Agent / MCP / AIR/1 envelopes
             │
             ▼
          a2uid
@@ -203,17 +203,19 @@ Agent / MCP / A2UI V1 envelopes
 
 `a2uid` is the sole owner of semantic state. Closing `a2ui` releases only the interactive renderer lease; Document, focus, input values, table selection and the agent session remain alive. The next client receives one atomic `Engine.PresentationSnapshot()` and resumes from the current state. Only one interactive client is accepted at a time.
 
+**Lifetime guarantee.** AIR state survives renderer detach/reconnect while the daemon remains alive. AIR does **not** currently promise recovery of semantic/runtime state after daemon crash, daemon restart, or machine reboot. No disk snapshot, journal, WAL or exactly-once-after-restart guarantee is part of AIR/1.
+
 Default socket path is `$XDG_RUNTIME_DIR/a2ui/a2ui.sock`; fallback is `/tmp/a2ui-$UID/a2ui.sock`. The runtime directory is `0700`, socket and startup lock are `0600`. Startup is serialized so concurrent daemons cannot unlink each other while recovering a stale socket.
 
 ```bash
-# persistent daemon; optional MCP HTTP bridge
+# long-lived daemon; optional MCP HTTP bridge
 go run ./cmd/a2uid -server 127.0.0.1:8080
 
 # attach/detach terminal renderer
 go run ./cmd/a2ui -preset dashboard
 ```
 
-Daemon/client IPC is a **local control protocol**, not a new public A2UI operation set. It uses bounded strict NDJSON with `hello`, `interaction`, `snapshot`, `frame_published`, `detach` and structured `ipc.*` errors. Snapshot delivery never implies visual publication: a pending agent commit is acknowledged only after the client renders that exact publication generation and sends `frame_published`. Disconnect before ACK leaves the barrier pending for the next client.
+Daemon/client IPC is a **local control protocol**, not a second public AIR/1 operation set. It uses bounded strict NDJSON with `hello`, `interaction`, `snapshot`, `frame_published`, `detach` and structured `ipc.*` errors. Snapshot delivery never implies visual publication: a pending agent commit is acknowledged only after the client renders that exact publication generation and sends `frame_published`. Disconnect before ACK leaves the barrier pending for the next client.
 
 `cmd/a2ui-runner` remains standalone and in-process for renderer development, conformance and CI.
 
@@ -232,7 +234,7 @@ The current Omarchy-oriented documentation checkpoint is split by audience inste
 - [Omarchy maintainer proposal draft](docs/omarchy-submission.md) — demo, packaging and upstream gates;
 - [A2UI for Omarchy overview](references/OMARCHY.md) — historical protocol-facing pitch and links without duplicating the normative protocol.
 
-`references/PROTOCOL.md` remains normative for the current A2UI V1 dialect. Mutable security/release status belongs in `docs/security-evidence.md`, not in this README.
+`references/PROTOCOL.md` remains normative for the current AIR/1 dialect. Mutable security/release status belongs in `docs/security-evidence.md`, not in this README.
 
 ## Transport profiles
 
@@ -246,7 +248,7 @@ Canonical debug and record/replay format. One JSON value per line. Record size i
 
 ### MCP bridge
 
-`transport/mcp` maps the current A2UI V1 envelopes to JSON-RPC messages and targets the modern stateless MCP transport model (`MCP-Protocol-Version: 2026-07-28`). AIR state remains explicit in the current `session` handle; it is not hidden in an MCP transport session.
+`transport/mcp` maps the current AIR/1 envelopes to JSON-RPC messages and targets the modern stateless MCP transport model (`MCP-Protocol-Version: 2026-07-28`). AIR state remains explicit in the current `session` handle; it is not hidden in an MCP transport session.
 
 This package is an integration bridge, **not a claim that `a2ui/*` is an officially registered MCP extension namespace**. A production MCP host can expose the bridge through its extension/tool policy.
 
@@ -254,7 +256,7 @@ This package is an integration bridge, **not a claim that `a2ui/*` is an officia
 
 ### UDP
 
-UDP v1 is intentionally restricted to telemetry. Document mutations, submit/action traffic and commit barriers are rejected by the codec. One A2UI payload = one UDP datagram; no fragmentation/reassembly is implemented. Default datagram budget is 1200 bytes.
+UDP v1 is intentionally restricted to telemetry. Document mutations, submit/action traffic and commit barriers are rejected by the codec. One AIR/1 payload = one UDP datagram; no fragmentation/reassembly is implemented. Default datagram budget is 1200 bytes.
 
 ## Direction
 
@@ -270,9 +272,9 @@ renderer-local    ANSI attributes, terminal width, caret, alternate screen,
                   window geometry, animation phase
 ```
 
-If a second renderer can consume `Engine.PresentationSnapshot()` without changing the semantic state machine, that boundary is real. If it cannot, the boundary was decorative.
+AIR keeps the second renderer outside the core product surface. An isolated local-Web experiment is retained as an adversarial architecture/regression oracle: it exercised `Engine.PresentationSnapshot()`, semantic action invocation, stable row-ID selection, publication acknowledgement and sequential renderer replacement without adding a second semantic state owner or requiring keyboard-shaped core interactions.
 
-A local web renderer is the intended cheapest second-surface experiment because it can cover Linux, macOS and Windows without committing AIR to a native GUI toolkit. Native desktop renderers such as SwiftUI, WinUI, GTK or Qt are deliberately out of scope until that architectural test has been run.
+That experiment is evidence about the boundary, not a commitment to ship or expand a Web product. Native desktop renderers such as SwiftUI, WinUI, GTK or Qt remain out of scope until there is a concrete product requirement for them.
 
 ### Protocol compatibility is an open question
 
@@ -286,7 +288,7 @@ Three outcomes remain possible and none is decided:
 |---|---|
 | **A** | make AIR a conformant runtime for an external UI specification |
 | **B** | keep the AIR core and add an ingress adapter for that specification |
-| **C** | keep A2UI V1 as an internal dialect and retire the historical protocol name from the public product surface |
+| **C** | keep AIR/1 as an internal dialect and retire the historical protocol name from the public product surface |
 
 B is currently the most natural architectural hypothesis because an ingress adapter is small relative to the runtime it feeds, but this is a direction rather than a commitment.
 
@@ -295,8 +297,8 @@ Whichever path is chosen, the daemon, lifetime separation, publication semantics
 ### Deliberate non-goals
 
 - a second internal protocol version merely to chase an external specification;
-- component-catalog expansion before a real renderer/compatibility requirement exists;
-- native GUI toolkits before the second-renderer test;
+- component-catalog expansion without a concrete external adapter requirement;
+- native GUI toolkits without a concrete product requirement;
 - rewriting the core in another language without a measured systems reason;
 - competing with external UI specifications for standard ownership;
 - becoming a general-purpose GUI framework.
@@ -316,7 +318,7 @@ Conformance replay lives in `conformance/testdata/` plus the staged Omarchy walk
 
 ## Normative documents
 
-1. `references/PROTOCOL.md` — current A2UI V1 semantic contract.
+1. `references/PROTOCOL.md` — current AIR/1 semantic contract.
 2. `assets/schema.json` — executable wire shape for upsert/envelopes/events.
 3. `references/TRANSPORTS.md` — transport guarantees and profile restrictions.
 4. `references/IMPLEMENTATION.md` — Go package boundaries and extension rules.

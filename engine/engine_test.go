@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"a2ui/protocol"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 )
 
 func op(seq int64, id string, typ protocol.NodeType, props string) protocol.Operation {

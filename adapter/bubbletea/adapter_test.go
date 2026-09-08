@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"a2ui/engine"
-	"a2ui/protocol"
-	a2runtime "a2ui/runtime"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	a2runtime "github.com/Ostrovsky42/agent-interaction-runtime/runtime"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )

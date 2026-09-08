@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"a2ui/protocol"
-	"a2ui/wire"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/wire"
 )
 
 // HandleEnvelope processes the public Agent-facing A2UI protocol while keeping

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"reflect"
 
-	"a2ui/document"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/document"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 type Binding struct {

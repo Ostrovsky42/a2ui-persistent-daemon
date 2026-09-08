@@ -2,14 +2,16 @@ package bubbletea
 
 import (
 	"context"
+	"encoding/json"
 
-	"a2ui/engine"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 // SemanticController is the renderer/controller boundary used by Bubble Tea.
 // Implementations may be in-process (Engine-backed) or remote (IPC-backed),
-// but all semantic authority remains behind this interface.
+// but all semantic authority remains behind this interface. Physical key input
+// is resolved to semantic interactions inside the renderer before crossing it.
 type SemanticController interface {
 	Snapshot() engine.PresentationSnapshot
 	Focus(id string) error
@@ -17,7 +19,7 @@ type SemanticController interface {
 	Submit(id string) error
 	MoveTableSelection(id string, delta int) error
 	ActivateTableSelection(id string) error
-	ActionKey(key string) error
+	InvokeAction(id, action string, args json.RawMessage) error
 	AcknowledgePublication(generation uint64) error
 }
 
@@ -52,8 +54,8 @@ func (c localSemanticController) ActivateTableSelection(id string) error {
 	return controllerError(c.eng.ActivateTableSelection(id))
 }
 
-func (c localSemanticController) ActionKey(key string) error {
-	return controllerError(c.eng.HandleKey(context.Background(), key))
+func (c localSemanticController) InvokeAction(id, action string, args json.RawMessage) error {
+	return controllerError(c.eng.InvokeAction(context.Background(), id, action, args))
 }
 
 func (c localSemanticController) AcknowledgePublication(generation uint64) error {

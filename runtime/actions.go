@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 )
 
 type ActionHandler func(context.Context, json.RawMessage) error
@@ -44,6 +44,9 @@ func (r *ActionRegistry) Register(id string, h ActionHandler) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if _, exists := r.handlers[id]; exists {
+		return fmt.Errorf("action %s already registered", id)
+	}
 	r.handlers[id] = h
 	return nil
 }

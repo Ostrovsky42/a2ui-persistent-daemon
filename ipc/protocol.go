@@ -1,9 +1,10 @@
 package ipc
 
 import (
+	"encoding/json"
 	"fmt"
 
-	"a2ui/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
 )
 
 const Version = 1
@@ -28,16 +29,23 @@ const (
 	InteractionInputSet      InteractionType = "input_set"
 	InteractionInputSubmit   InteractionType = "input_submit"
 	InteractionTableMove     InteractionType = "table_move"
+	InteractionTableSelect   InteractionType = "table_select"
 	InteractionTableActivate InteractionType = "table_activate"
-	InteractionActionKey     InteractionType = "action_key"
+	InteractionActionInvoke  InteractionType = "action_invoke"
+	// InteractionActionKey is retained only for local IPC compatibility. New
+	// renderers must translate physical input into InteractionActionInvoke.
+	InteractionActionKey InteractionType = "action_key"
 )
 
 type Interaction struct {
-	Type  InteractionType `json:"type"`
-	ID    string          `json:"id,omitempty"`
-	Value string          `json:"value,omitempty"`
-	Delta int             `json:"delta,omitempty"`
-	Key   string          `json:"key,omitempty"`
+	Type   InteractionType `json:"type"`
+	ID     string          `json:"id,omitempty"`
+	Value  string          `json:"value,omitempty"`
+	Delta  int             `json:"delta,omitempty"`
+	Key    string          `json:"key,omitempty"`
+	RowID  string          `json:"row_id,omitempty"`
+	Action string          `json:"action,omitempty"`
+	Args   json.RawMessage `json:"args,omitempty"`
 }
 
 type Snapshot struct {
@@ -62,8 +70,8 @@ func NewError(code, message string) *Error {
 }
 
 // Message is the versioned local daemon/client control envelope. Fields are
-// intentionally finite and kind-discriminated; this is not the public A2UI
-// Agent protocol.
+// intentionally finite and kind-discriminated; this is not the public AIR/1
+// agent protocol.
 type Message struct {
 	V                     int          `json:"v"`
 	Kind                  Kind         `json:"kind"`
@@ -85,6 +93,14 @@ func ValidateInteraction(in *Interaction) *Error {
 	case InteractionFocus, InteractionInputSet, InteractionInputSubmit, InteractionTableMove, InteractionTableActivate:
 		if in.ID == "" {
 			return NewError("ipc.invalid_interaction", fmt.Sprintf("%s requires id", in.Type))
+		}
+	case InteractionTableSelect:
+		if in.ID == "" || in.RowID == "" {
+			return NewError("ipc.invalid_interaction", "table_select requires id and row_id")
+		}
+	case InteractionActionInvoke:
+		if in.ID == "" || in.Action == "" {
+			return NewError("ipc.invalid_interaction", "action_invoke requires id and action")
 		}
 	case InteractionActionKey:
 		if in.Key == "" {

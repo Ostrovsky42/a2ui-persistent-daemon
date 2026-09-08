@@ -6,17 +6,20 @@ import (
 	"strings"
 	"testing"
 
-	"a2ui/engine"
-	"a2ui/protocol"
+	"github.com/Ostrovsky42/agent-interaction-runtime/engine"
+	"github.com/Ostrovsky42/agent-interaction-runtime/protocol"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type fakeSemanticController struct {
-	snapshot engine.PresentationSnapshot
-	setID    string
-	setValue string
-	acks     []uint64
-	connErr  error
+	snapshot      engine.PresentationSnapshot
+	setID         string
+	setValue      string
+	invokedID     string
+	invokedAction string
+	invokedArgs   json.RawMessage
+	acks          []uint64
+	connErr       error
 }
 
 func (f *fakeSemanticController) Snapshot() engine.PresentationSnapshot { return f.snapshot }
@@ -30,7 +33,12 @@ func (f *fakeSemanticController) SetInput(id, value string) error {
 func (f *fakeSemanticController) Submit(string) error                  { return nil }
 func (f *fakeSemanticController) MoveTableSelection(string, int) error { return nil }
 func (f *fakeSemanticController) ActivateTableSelection(string) error  { return nil }
-func (f *fakeSemanticController) ActionKey(string) error               { return nil }
+func (f *fakeSemanticController) InvokeAction(id, action string, args json.RawMessage) error {
+	f.invokedID = id
+	f.invokedAction = action
+	f.invokedArgs = append(json.RawMessage(nil), args...)
+	return nil
+}
 func (f *fakeSemanticController) AcknowledgePublication(generation uint64) error {
 	f.acks = append(f.acks, generation)
 	return nil
@@ -60,6 +68,23 @@ func TestModelCanRenderAndEditThroughSemanticControllerWithoutEngine(t *testing.
 	}
 	if got := m.View(); got == "" {
 		t.Fatal("controller-backed model rendered an empty frame")
+	}
+}
+
+func TestPhysicalActionKeyIsResolvedToSemanticInvocationInsideRenderer(t *testing.T) {
+	eng := newTestEngine()
+	if err := eng.Apply(protocol.Operation{
+		V: 1, Seq: 1, Op: protocol.OpUpsert, ID: "actions", Type: protocol.NodeActions, Parent: "root",
+		Props: json.RawMessage(`{"items":[{"key":"y","label":"Approve","action":"approve","args":{"target":"prod"}}]}`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ctrl := &fakeSemanticController{snapshot: eng.PresentationSnapshot()}
+	m := NewModelWithController(ctrl, DefaultTheme, PresetMinimal, nil)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	_ = updated.(Model)
+	if ctrl.invokedID != "actions" || ctrl.invokedAction != "approve" || string(ctrl.invokedArgs) != `{"target":"prod"}` {
+		t.Fatalf("semantic invocation id=%q action=%q args=%s", ctrl.invokedID, ctrl.invokedAction, ctrl.invokedArgs)
 	}
 }
 
