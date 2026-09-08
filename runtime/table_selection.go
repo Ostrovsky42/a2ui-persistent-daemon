@@ -129,6 +129,32 @@ func (s *State) SetTableSelection(d document.Document, id string, index int) *pr
 	return nil
 }
 
+// SetTableSelectionByRowID selects a stable semantic row identity. It is the
+// renderer-neutral counterpart to relative keyboard/navigation movement.
+func (s *State) SetTableSelectionByRowID(d document.Document, id, rowID string) *protocol.Error {
+	n, ok := d.Nodes[id]
+	if !ok {
+		return protocol.NewError("document.node_not_found", fmt.Sprintf("node %q not found", id))
+	}
+	if n.Type != protocol.NodeTable {
+		return protocol.NewError("runtime.not_table", fmt.Sprintf("node %q is not table", id))
+	}
+	if !propBool(n, "selectable") {
+		return protocol.NewError("runtime.not_selectable", fmt.Sprintf("table %q is not selectable", id))
+	}
+	rows := tableRows(n)
+	ids := tableRowIDs(n)
+	if len(rows) == 0 || len(ids) != len(rows) {
+		return protocol.NewError("runtime.row_ids_unavailable", fmt.Sprintf("table %q has no stable row ids", id))
+	}
+	for index, candidate := range ids {
+		if candidate == rowID {
+			return s.SetTableSelection(d, id, index)
+		}
+	}
+	return protocol.NewError("runtime.row_id_not_found", fmt.Sprintf("row id %q not found in table %q", rowID, id))
+}
+
 // MoveTableSelection moves the selected row without wrapping.
 func (s *State) MoveTableSelection(d document.Document, id string, delta int) *protocol.Error {
 	n, ok := d.Nodes[id]
