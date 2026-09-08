@@ -15,29 +15,31 @@ const (
 	EventTelemetry
 )
 
+type queuedEvent struct {
+	order uint64
+	event protocol.Event
+}
+
 type EventBroker struct {
 	mu        sync.Mutex
 	cap       int
 	nextOrder uint64
 	nextSeq   uint64
-	critical  []protocol.Event
-	coalesced map[string]protocol.Event
-	telemetry []protocol.Event
+	critical  []queuedEvent
+	coalesced map[string]queuedEvent
+	telemetry []queuedEvent
 }
 
 func NewEventBroker(capacity int) *EventBroker {
 	if capacity < 1 {
 		capacity = 1
 	}
-	return &EventBroker{cap: capacity, coalesced: map[string]protocol.Event{}}
+	return &EventBroker{cap: capacity, coalesced: map[string]queuedEvent{}}
 }
 
-// order stamps an internal enqueue order into Seq. Next overwrites it with the
-// contiguous externally visible delivery sequence.
-func (b *EventBroker) order(ev protocol.Event) protocol.Event {
+func (b *EventBroker) order(ev protocol.Event) queuedEvent {
 	b.nextOrder++
-	ev.Seq = b.nextOrder
-	return ev
+	return queuedEvent{order: b.nextOrder, event: ev}
 }
 
 func (b *EventBroker) depthLocked() int {
@@ -104,23 +106,23 @@ func (b *EventBroker) Next() (protocol.Event, bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if len(b.critical) > 0 {
-		ev := b.critical[0]
+		ev := b.critical[0].event
 		b.critical = b.critical[1:]
 		return b.deliver(ev), true
 	}
 	if len(b.coalesced) > 0 {
 		var chosenKey string
-		var chosen protocol.Event
+		var chosen queuedEvent
 		for k, ev := range b.coalesced {
-			if chosenKey == "" || ev.Seq < chosen.Seq {
+			if chosenKey == "" || ev.order < chosen.order {
 				chosenKey, chosen = k, ev
 			}
 		}
 		delete(b.coalesced, chosenKey)
-		return b.deliver(chosen), true
+		return b.deliver(chosen.event), true
 	}
 	if len(b.telemetry) > 0 {
-		ev := b.telemetry[0]
+		ev := b.telemetry[0].event
 		b.telemetry = b.telemetry[1:]
 		return b.deliver(ev), true
 	}
