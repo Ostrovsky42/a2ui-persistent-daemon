@@ -60,6 +60,29 @@ func TestSemanticActionInvokeDoesNotRequirePhysicalKey(t *testing.T) {
 	}
 }
 
+func TestSemanticActionInvokeCannotReachUnboundHostCapability(t *testing.T) {
+	actions := a2runtime.NewActionRegistry(time.Second, 1)
+	called := false
+	if err := actions.Register("host.secret", func(context.Context, json.RawMessage) error {
+		called = true
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	d := New("semantic-action-boundary", protocol.DefaultLimits(), actions)
+	perr := d.handleInteraction(context.Background(), &ipc.Interaction{
+		Type:   ipc.InteractionActionInvoke,
+		ID:     "actions",
+		Action: "host.secret",
+	})
+	if perr == nil || perr.Code != "action.not_permitted" {
+		t.Fatalf("unbound host capability must be rejected, got %+v", perr)
+	}
+	if called {
+		t.Fatal("unbound host capability was invoked")
+	}
+}
+
 func TestSemanticTableSelectUsesStableRowID(t *testing.T) {
 	d := New("semantic-row", protocol.DefaultLimits(), nil)
 	if perr := d.Engine.Apply(protocol.Operation{
