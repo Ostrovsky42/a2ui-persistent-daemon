@@ -1,0 +1,51 @@
+name: air-r0-doc-migration
+
+on:
+  push:
+    branches:
+      - feature/20260908-air-r0-core-boundary-consolidation
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rename current protocol surface to AIR/1
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for name in ['references/PROTOCOL.md', 'docs/protocol-guide.md']:
+              path = Path(name)
+              text = path.read_text()
+              text = text.replace('A2UI V1', 'AIR/1').replace('A2UI v1', 'AIR/1')
+              text = text.replace('A2UI', 'AIR')
+              path.write_text(text)
+
+          path = Path('README.md')
+          text = path.read_text()
+          text = text.replace('A2UI V1', 'AIR/1').replace('A2UI v1', 'AIR/1')
+          text = text.replace('"a2ui/', '"github.com/Ostrovsky42/agent-interaction-runtime/')
+          text = text.replace('```text\na2ui/\n', '```text\nagent-interaction-runtime/\n')
+          text = text.replace('Agent / MCP / AIR/1 envelopes', 'Agent / MCP / AIR/1 envelopes')
+          path.write_text(text)
+          PY
+          git diff --check
+      - name: Commit AIR/1 naming migration
+        run: |
+          if git diff --quiet; then
+            echo 'No documentation migration changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md references/PROTOCOL.md docs/protocol-guide.md
+          git commit -m 'docs(protocol): rename current dialect to AIR/1'
+          git push origin HEAD:${GITHUB_REF_NAME}
