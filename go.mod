@@ -1,11 +1,14 @@
-module a2ui
+module github.com/Ostrovsky42/agent-interaction-runtime
 
 go 1.24.0
 
 require (
+	a2ui v0.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 )
+
+replace a2ui => .
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
