@@ -2,7 +2,7 @@
 
 A local persistent human-interaction runtime for AI agents.
 
-> **Historical naming.** This repository was originally developed under the name A2UI. Its current `A2UI V1` wire dialect predates and is not an implementation of Google's [A2UI specification](https://github.com/google/A2UI). The wire models are different and currently not compatible. External A2UI compatibility is an explicitly open architectural question described in [Направление](#направление).
+> **Historical naming.** This repository was originally developed under the name A2UI. Its current `A2UI V1` wire dialect predates and is not an implementation of Google's [A2UI specification](https://github.com/google/A2UI). The wire models are different and currently not compatible. External A2UI compatibility is an explicitly open architectural question described in [Direction](#direction).
 
 AIR separates the lifetime of an agent session from the lifetime of the surface a human happens to be looking at.
 
@@ -63,21 +63,21 @@ The current `A2UI V1` protocol is one semantic dialect used by AIR, not the defi
 UDP telemetry ────── lossy side profile only
 ```
 
-## Что теперь является ядром
+## What is core now
 
-- `document.Document` — единственный authoritative UI state.
-- Failed mutation не меняет Document.
+- `document.Document` is the single authoritative UI state.
+- A failed mutation does not change the Document.
 - `upsert` = full replacement props; `props` = shallow top-level merge.
-- `box` и `viewport` могут иметь children; остальные node types — leaves.
-- Focus, input value и semantic table selection — runtime projection; input caret, viewport offset, animation phase и terminal dimensions — renderer/adapter-local presentation state.
-- `input.force` — one-shot mutation policy и не сохраняется в props.
-- Critical events не могут молча исчезнуть при backpressure.
-- Action bindings детерминированы tree order; конфликт key отклоняет candidate.
-- `commit` — publication barrier с `revision` и `through_seq`, а не фиктивный dirty flag.
-- Все входные и retained Document ресурсы имеют finite limits, включая aggregate `max_document_bytes`.
-- Unknown fields/props и duplicate JSON keys отвергаются.
+- `box` and `viewport` may have children; all other node types are leaves.
+- Focus, input value and semantic table selection are runtime projection; input caret, viewport offset, animation phase and terminal dimensions are renderer/adapter-local presentation state.
+- `input.force` is a one-shot mutation policy and is not retained in props.
+- Critical events cannot silently disappear under backpressure.
+- Action bindings are deterministic in tree order; a conflicting key rejects the candidate.
+- `commit` is a publication barrier carrying `revision` and `through_seq`, not a synthetic dirty flag.
+- All incoming and retained Document resources have finite limits, including aggregate `max_document_bytes`.
+- Unknown fields/props and duplicate JSON keys are rejected.
 
-## Пакеты
+## Packages
 
 ```text
 a2ui/
@@ -107,7 +107,7 @@ a2ui/
 
 Core deliberately uses only the Go standard library. Renderer dependencies are adapters and do not participate in protocol correctness.
 
-## Быстрый старт
+## Quick start
 
 ```go
 package main
@@ -256,9 +256,9 @@ This package is an integration bridge, **not a claim that `a2ui/*` is an officia
 
 UDP v1 is intentionally restricted to telemetry. Document mutations, submit/action traffic and commit barriers are rejected by the codec. One A2UI payload = one UDP datagram; no fragmentation/reassembly is implemented. Default datagram budget is 1200 bytes.
 
-## Направление
+## Direction
 
-This section describes **intent, not implemented features.** Everything currently implemented is described above and gated by the repository checks in [Проверка](#проверка). Nothing in this section carries a release or verification status claim; mutable status belongs in `docs/security-evidence.md`.
+This section describes **intent, not implemented features.** Everything currently implemented is described above and gated by the repository checks in [Verification](#verification). Nothing in this section carries a release or verification status claim; mutable status belongs in `docs/security-evidence.md`.
 
 ### Renderer neutrality is the real test
 
@@ -292,7 +292,7 @@ B is currently the most natural architectural hypothesis because an ingress adap
 
 Whichever path is chosen, the daemon, lifetime separation, publication semantics and causality work remain independent of the external wire format. That runtime layer is the durable part of the project.
 
-### Что сознательно не делается
+### Deliberate non-goals
 
 - a second internal protocol version merely to chase an external specification;
 - component-catalog expansion before a real renderer/compatibility requirement exists;
@@ -301,7 +301,7 @@ Whichever path is chosen, the daemon, lifetime separation, publication semantics
 - competing with external UI specifications for standard ownership;
 - becoming a general-purpose GUI framework.
 
-## Проверка
+## Verification
 
 Repository gates:
 
@@ -314,7 +314,7 @@ go vet ./...
 
 Conformance replay lives in `conformance/testdata/` plus the staged Omarchy walkthrough under `assets/examples/`. Fuzz entrypoints are in `wire/fuzz_test.go`, `document/model_test.go`, and `ipc/codec_test.go`.
 
-## Нормативные документы
+## Normative documents
 
 1. `references/PROTOCOL.md` — current A2UI V1 semantic contract.
 2. `assets/schema.json` — executable wire shape for upsert/envelopes/events.
