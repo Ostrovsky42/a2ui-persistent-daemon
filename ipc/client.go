@@ -341,9 +341,19 @@ func (c *Client) Submit(id string) error {
 func (c *Client) MoveTableSelection(id string, delta int) error {
 	return c.request(Interaction{Type: InteractionTableMove, ID: id, Delta: delta})
 }
+func (c *Client) SelectTableRow(id, rowID string) error {
+	return c.request(Interaction{Type: InteractionTableSelect, ID: id, RowID: rowID})
+}
 func (c *Client) ActivateTableSelection(id string) error {
 	return c.request(Interaction{Type: InteractionTableActivate, ID: id})
 }
+func (c *Client) InvokeAction(id, action string, args json.RawMessage) error {
+	return c.request(Interaction{Type: InteractionActionInvoke, ID: id, Action: action, Args: append(json.RawMessage(nil), args...)})
+}
+
+// ActionKey is retained for compatibility with older local clients. New
+// renderer code should resolve a local physical key to a semantic Binding and
+// call InvokeAction instead.
 func (c *Client) ActionKey(key string) error {
 	return c.request(Interaction{Type: InteractionActionKey, Key: key})
 }
