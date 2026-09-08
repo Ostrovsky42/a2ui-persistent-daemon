@@ -1,4 +1,4 @@
-# A2UI v1 Hardened — normative protocol
+# AIR/1 Hardened — normative protocol
 
 `PROTOCOL.md` is normative. `SKILL.md` is a shortened agent-facing projection. If they disagree, this document wins.
 
@@ -6,9 +6,9 @@ Normative terms **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** 
 
 ## 1. Scope
 
-A2UI synchronizes a declarative UI document from an untrusted or semi-trusted agent to a trusted local runtime. The protocol does not permit arbitrary code execution. A renderer (Bubble Tea, web, SDL, embedded display) is an adapter and MUST NOT become the source of truth for protocol state.
+AIR synchronizes a declarative UI document from an untrusted or semi-trusted agent to a trusted local runtime. The protocol does not permit arbitrary code execution. A renderer (Bubble Tea, web, SDL, embedded display) is an adapter and MUST NOT become the source of truth for protocol state.
 
-A2UI v1 keeps six document operations:
+AIR/1 keeps six document operations:
 
 `upsert`, `props`, `text`, `remove`, `focus`, `commit`.
 
@@ -24,7 +24,7 @@ A conforming implementation separates:
 transport -> wire -> session -> protocol -> document/reconciler -> runtime projection -> renderer
 ```
 
-`document.Document` semantics are authoritative agent-owned state. A2UI v1 distinguishes renderer-independent runtime projection from adapter-local presentation mechanics:
+`document.Document` semantics are authoritative agent-owned state. AIR/1 distinguishes renderer-independent runtime projection from adapter-local presentation mechanics:
 
 ```text
 Document            table rows, row IDs, viewport policies, props, tree
@@ -89,7 +89,7 @@ Unknown top-level wire fields MUST be rejected in v1. Duplicate JSON object keys
 
 ## 5. Session negotiation
 
-Reliable hardened profiles use an A2UI session state machine:
+Reliable hardened profiles use an AIR session state machine:
 
 ```text
 NEW -> READY -> DRAINING -> CLOSED
@@ -102,11 +102,11 @@ A `hello` payload advertises supported protocol versions and optional features. 
 - accepted feature set;
 - finite resource limits.
 
-`hello_ack.components` is the complete node-type allowlist the endpoint guarantees it can accept and present for that session. An agent MUST NOT send a node type absent from this set. A newer agent that knows additional component types MUST degrade before sending by expressing the surface with advertised V1 components. Receiving an unknown node type remains a strict schema error. A2UI V1 does not define a generic node-level fallback field or catalog negotiation mechanism.
+`hello_ack.components` is the complete node-type allowlist the endpoint guarantees it can accept and present for that session. An agent MUST NOT send a node type absent from this set. A newer agent that knows additional component types MUST degrade before sending by expressing the surface with advertised V1 components. Receiving an unknown node type remains a strict schema error. AIR/1 does not define a generic node-level fallback field or catalog negotiation mechanism.
 
 If version intersection is empty, the error is fatal and the session does not become READY.
 
-A2UI session state is application state. When carried over modern MCP, it MUST be represented explicitly by the A2UI session handle; implementations MUST NOT assume an MCP transport session exists.
+AIR session state is application state. When carried over modern MCP, it MUST be represented explicitly by the AIR session handle; implementations MUST NOT assume an MCP transport session exists.
 
 ## 6. Sequence numbers and revisions
 
@@ -225,7 +225,7 @@ A renderer MAY coalesce ordinary dirty revisions before publication. It MUST NOT
 
 ### Common presentation hints
 
-Presentation hints are semantic and renderer-neutral. They do not encode a concrete theme. A renderer preset such as `minimal`, `dashboard`, or `dense` is local renderer configuration and MUST NOT be sent as an A2UI node property.
+Presentation hints are semantic and renderer-neutral. They do not encode a concrete theme. A renderer preset such as `minimal`, `dashboard`, or `dense` is local renderer configuration and MUST NOT be sent as an AIR node property.
 
 Presentation resolution uses this precedence when a semantic variant supplies renderer defaults:
 
@@ -343,7 +343,7 @@ Arbitrary hex/rgb values are rejected as `schema.invalid_color`. Theme token map
 
 ## 14. Renderer presets and animation
 
-A renderer MAY expose local presets such as `minimal`, `dashboard`, and `dense`. Presets choose concrete borders, spacing, glyphs and terminal theme roles for the same semantic Document. Preset selection is outside the A2UI protocol.
+A renderer MAY expose local presets such as `minimal`, `dashboard`, and `dense`. Presets choose concrete borders, spacing, glyphs and terminal theme roles for the same semantic Document. Preset selection is outside the AIR protocol.
 
 Animation is renderer-local ephemeral state. An idle renderer MUST NOT require a perpetual timer. When a semantic state requires motion, a renderer MAY schedule bounded event-driven ticks and update only local animation phase/cursor phase. Such ticks MUST NOT:
 
