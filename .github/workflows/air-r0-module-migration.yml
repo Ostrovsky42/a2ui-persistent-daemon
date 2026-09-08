@@ -44,10 +44,9 @@ jobs:
           go mod edit -droprequire=a2ui
           go mod edit -dropreplace=a2ui
           go mod tidy
-          files="$(gofmt -l .)"
-          if [ -n "$files" ]; then
-            printf '%s\n' "$files"
-            exit 1
+          changed_go="$(git diff --name-only -- '*.go')"
+          if [ -n "$changed_go" ]; then
+            gofmt -w $changed_go
           fi
           git diff --check
       - name: Commit canonical imports
@@ -58,6 +57,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add go.mod go.sum '*.go' ':/**/*.go'
+          git add -u
           git commit -m 'refactor(module): migrate internal imports to canonical AIR path'
           git push origin HEAD:${GITHUB_REF_NAME}
