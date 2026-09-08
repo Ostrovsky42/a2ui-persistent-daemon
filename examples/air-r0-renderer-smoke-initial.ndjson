@@ -1,0 +1,6 @@
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":1,"payload":{"v":1,"seq":1,"op":"upsert","id":"panel","type":"box","parent":"root","props":{"dir":"col","padding":1,"gap":1,"border":"rounded","variant":"panel"}}}
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":2,"payload":{"v":1,"seq":2,"op":"upsert","id":"title","type":"text","parent":"panel","props":{"text":"AIR R0 hardware smoke — TUI phase","variant":"title"}}}
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":3,"payload":{"v":1,"seq":3,"op":"upsert","id":"answer","type":"input","parent":"panel","props":{"placeholder":"type from-tui and press Enter","value":"","action":"submit_smoke"}}}
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":4,"payload":{"v":1,"seq":4,"op":"upsert","id":"surfaces","type":"table","parent":"panel","props":{"columns":[{"title":"Surface"}],"rows":[["Terminal / Bubble Tea"],["Local Web"]],"row_ids":["tui","web"],"selectable":true,"action":"select_surface"}}}
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":5,"payload":{"v":1,"seq":5,"op":"upsert","id":"progress","type":"progress","parent":"panel","props":{"value":0.42,"label":"42% — initial surface","variant":"bar","state":"normal"}}}
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":6,"payload":{"v":1,"seq":6,"op":"commit","frame":"air-r0-tui-phase"}}

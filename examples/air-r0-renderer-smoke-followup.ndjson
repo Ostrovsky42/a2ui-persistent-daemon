@@ -1,0 +1,4 @@
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":7,"payload":{"v":1,"seq":7,"op":"props","id":"title","props":{"text":"AIR R0 hardware smoke — Web phase"}}}
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":8,"payload":{"v":1,"seq":8,"op":"props","id":"surfaces","props":{"rows":[["Local Web"],["Terminal / Bubble Tea"]],"row_ids":["web","tui"]}}}
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":9,"payload":{"v":1,"seq":9,"op":"props","id":"progress","props":{"value":0.73,"label":"detached agent update","state":"loading"}}}
+{"v":1,"session":"hardware-smoke","kind":"operation","seq":10,"payload":{"v":1,"seq":10,"op":"commit","frame":"air-r0-web-phase"}}

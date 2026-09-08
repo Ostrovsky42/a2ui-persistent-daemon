@@ -177,6 +177,10 @@ func preferredTableWidths(cols []tableColumn) []int {
 		if widths[i] < tableMinColumnWidth {
 			widths[i] = tableMinColumnWidth
 		}
+		titleWidth := lipgloss.Width(SanitizeSingleLineText(col.Title))
+		if col.Width <= 0 && titleWidth > widths[i] {
+			widths[i] = titleWidth
+		}
 	}
 	return widths
 }
@@ -328,7 +332,7 @@ func shrinkTableWidths(widths []int, budget int) []int {
 
 func allColumnIndexes(count int) []int {
 	out := make([]int, count)
-	for i := range out {
+	for i := 0; i < count; i++ {
 		out[i] = i
 	}
 	return out
