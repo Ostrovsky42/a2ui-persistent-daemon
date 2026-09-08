@@ -13,12 +13,12 @@ import (
 )
 
 type fakeController struct {
-	snapshot       engine.PresentationSnapshot
-	invokedID      string
-	invokedAction  string
-	invokedArgs    json.RawMessage
-	selectedID     string
-	selectedRowID  string
+	snapshot        engine.PresentationSnapshot
+	invokedID       string
+	invokedAction   string
+	invokedArgs     json.RawMessage
+	selectedID      string
+	selectedRowID   string
 	ackedGeneration uint64
 }
 
