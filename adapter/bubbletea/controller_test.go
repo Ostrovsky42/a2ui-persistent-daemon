@@ -18,8 +18,8 @@ type fakeSemanticController struct {
 	invokedID     string
 	invokedAction string
 	invokedArgs   json.RawMessage
-	acks           []uint64
-	connErr        error
+	acks          []uint64
+	connErr       error
 }
 
 func (f *fakeSemanticController) Snapshot() engine.PresentationSnapshot { return f.snapshot }
