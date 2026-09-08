@@ -11,18 +11,29 @@ import (
 	"time"
 )
 
+func shortSocketTempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "air-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
 func TestResolveSocketPathPrefersXDGAndFallsBackPerUID(t *testing.T) {
 	if got := ResolveSocketPath("/run/user/1000", 1000); got != "/run/user/1000/a2ui/a2ui.sock" {
 		t.Fatalf("unexpected XDG path %q", got)
 	}
 	got := ResolveSocketPath("", 4242)
-	if got != "/tmp/a2ui-4242/a2ui.sock" {
-		t.Fatalf("unexpected fallback path %q", got)
+	want := filepath.Join(os.TempDir(), "a2ui-4242", "a2ui.sock")
+	if got != want {
+		t.Fatalf("unexpected fallback path %q, want %q", got, want)
 	}
 }
 
 func TestListenUnixSecuresDirectoryAndSocket(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "runtime", "a2ui.sock")
+	path := filepath.Join(shortSocketTempDir(t), "runtime", "a2ui.sock")
 	ln, perr := ListenUnix(path)
 	if perr != nil {
 		t.Fatalf("listen: %v", perr)
@@ -46,7 +57,7 @@ func TestListenUnixSecuresDirectoryAndSocket(t *testing.T) {
 }
 
 func TestListenUnixDoesNotRemoveLiveDaemonSocket(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "a2ui.sock")
+	path := filepath.Join(shortSocketTempDir(t), "a2ui.sock")
 	first, perr := ListenUnix(path)
 	if perr != nil {
 		t.Fatal(perr)
@@ -67,7 +78,7 @@ func TestListenUnixDoesNotRemoveLiveDaemonSocket(t *testing.T) {
 }
 
 func TestListenUnixRecoversStaleSocket(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "a2ui.sock")
+	path := filepath.Join(shortSocketTempDir(t), "a2ui.sock")
 	addr := &net.UnixAddr{Name: path, Net: "unix"}
 	stale, err := net.ListenUnix("unix", addr)
 	if err != nil {
@@ -92,7 +103,7 @@ func TestListenUnixRecoversStaleSocket(t *testing.T) {
 }
 
 func TestConcurrentListenUnixNeverUnlinksWinningLiveDaemon(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "a2ui.sock")
+	path := filepath.Join(shortSocketTempDir(t), "a2ui.sock")
 	const contenders = 12
 	type result struct {
 		ln   *net.UnixListener
