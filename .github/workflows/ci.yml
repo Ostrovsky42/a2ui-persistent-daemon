@@ -40,6 +40,8 @@ jobs:
   macos-core:
     runs-on: macos-latest
     timeout-minutes: 10
+    env:
+      TMPDIR: /tmp
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
